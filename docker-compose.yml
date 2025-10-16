@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  # LIMS FastAPI Application
+  lims-api:
+    build: .
+    container_name: lims-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - DATABASE_HOST=sqlserver
+      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_USER=sa
+      - DATABASE_PASSWORD=YourStrongPassword123!
+      - SECRET_KEY=your-super-secret-key-change-in-production
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - sqlserver
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+      - ./reports:/app/reports
+      - ./temp:/app/temp
+      - ./signatures:/app/signatures
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: lims-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrongPassword123!
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+  # Redis for Celery task queue
+  redis:
+    image: redis:7-alpine
+    container_name: lims-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+  # Celery Worker for background tasks
+  celery-worker:
+    build: .
+    container_name: lims-celery-worker
+    command: celery -A app.core.celery worker --loglevel=info
+    environment:
+      - DEBUG=False
+      - DATABASE_HOST=sqlserver
+      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_USER=sa
+      - DATABASE_PASSWORD=YourStrongPassword123!
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - sqlserver
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+      - ./reports:/app/reports
+      - ./temp:/app/temp
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+  # Celery Beat for scheduled tasks
+  celery-beat:
+    build: .
+    container_name: lims-celery-beat
+    command: celery -A app.core.celery beat --loglevel=info
+    environment:
+      - DEBUG=False
+      - DATABASE_HOST=sqlserver
+      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_USER=sa
+      - DATABASE_PASSWORD=YourStrongPassword123!
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - sqlserver
+      - redis
+    volumes:
+      - ./temp:/app/temp
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: lims-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - lims-api
+    networks:
+      - lims-network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  lims-network:
+    driver: bridge
