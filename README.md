@@ -124,7 +124,7 @@ Create a `.env` file based on `.env.example`:
 # Database
 DATABASE_HOST=localhost
 DATABASE_PORT=1433
-DATABASE_NAME=LIMS_PVS
+DATABASE_NAME=LIMS
 DATABASE_USER=sa
 DATABASE_PASSWORD=YourPassword
 
@@ -140,7 +140,7 @@ LOG_LEVEL=INFO
 ### Database Setup
 
 1. **SQL Server**: Ensure SQL Server is running and accessible
-2. **Database**: Create the LIMS_PVS database
+2. **Database**: Create the LIMS database
 3. **Tables**: Tables will be created automatically on first run
 4. **Data Migration**: Use the provided scripts to migrate data from MATLAB system
 

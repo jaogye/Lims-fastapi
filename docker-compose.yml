@@ -10,7 +10,7 @@ services:
     environment:
       - DEBUG=False
       - DATABASE_HOST=sqlserver
-      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_NAME=LIMS
       - DATABASE_USER=sa
       - DATABASE_PASSWORD=YourStrongPassword123!
       - SECRET_KEY=your-super-secret-key-change-in-production
@@ -65,7 +65,7 @@ services:
     environment:
       - DEBUG=False
       - DATABASE_HOST=sqlserver
-      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_NAME=LIMS
       - DATABASE_USER=sa
       - DATABASE_PASSWORD=YourStrongPassword123!
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -89,7 +89,7 @@ services:
     environment:
       - DEBUG=False
       - DATABASE_HOST=sqlserver
-      - DATABASE_NAME=LIMS_PVS
+      - DATABASE_NAME=LIMS
       - DATABASE_USER=sa
       - DATABASE_PASSWORD=YourStrongPassword123!
       - CELERY_BROKER_URL=redis://redis:6379/0
