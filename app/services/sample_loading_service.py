@@ -52,7 +52,7 @@ class SampleLoadingService:
         # Try to find customer-specific specification
         if customer:
             sql = text("""
-                SELECT id, certificaat FROM spec
+                SELECT id, certificate FROM spec
                 WHERE type_spec='CLI' AND product_id=:product_id
                 AND quality_id=:quality_id AND customer=:customer
             """)
@@ -67,7 +67,7 @@ class SampleLoadingService:
 
         # Fall back to general specification
         sql = text("""
-            SELECT id, certificaat FROM spec
+            SELECT id, certificate FROM spec
             WHERE type_spec='GEN' AND product_id=:product_id
             AND quality_id=:quality_id
         """)
@@ -302,13 +302,13 @@ class SampleLoadingService:
             for row in data:
                 row_dict = dict(row._mapping)
                 typerow = row_dict['typerow']
-
+                
                 # Handle error cases
                 if typerow == 'E1':
                     errors.append(f"Article code {row_dict['article_no']} not found in Map table")
                     pending_data.append(row_dict)
                     continue
-
+                
                 if typerow == 'E2':
                     errors.append(
                         f"No specification found for combination: "
@@ -317,7 +317,7 @@ class SampleLoadingService:
                     )
                     pending_data.append(row_dict)
                     continue
-
+                
                 # Get spec_id and limits
                 spec_id, _ = self._get_spec_id(
                     row_dict['product_id'],
@@ -354,7 +354,9 @@ class SampleLoadingService:
                             order_number_client, description, loading_ton, sample_number,
                             remark, batch_number, container_number,
                             certificate, coa, coc, day_coa, opm, onedecimal
-                        ) VALUES (
+                        )
+                        OUTPUT INSERTED.id
+                        VALUES (
                             'CLI', :spec_id, :product_id, :quality_id, :article_code, :customer,
                             :user_id, :creation_date, :date, :time, :order_number_pvs, :article_no,
                             :order_number_client, :description, :loading_ton, :sample_number,
@@ -363,7 +365,7 @@ class SampleLoadingService:
                         )
                     """)
 
-                    self.db.execute(sql_insert, {
+                    result = self.db.execute(sql_insert, {
                         'spec_id': spec_id,
                         'product_id': row_dict['product_id'],
                         'quality_id': row_dict['quality_id'],
@@ -387,9 +389,15 @@ class SampleLoadingService:
                         'onedecimal': row_dict.get('onedecimal', '')
                     })
 
-                    # Get the inserted sample ID
-                    result = self.db.execute(text("SELECT SCOPE_IDENTITY() as id")).first()
-                    sample_id = int(result[0])
+                    # Get inserted sample ID from OUTPUT clause
+                    row = result.first()
+                    if row:
+                        sample_id = int(row[0]) if row[0] is not None else None
+                    else:
+                        sample_id = None
+
+                    if sample_id is None:
+                        raise ValueError("Failed to retrieve inserted sample ID")
 
                     # Insert measurements if COA or Day_COA is required
                     if row_dict.get('coa') == 'X' or row_dict.get('day_coa') == 'X':
@@ -666,14 +674,16 @@ class SampleLoadingService:
                 type_sample, spec_id, customer, sample_matrix_id,
                 product_id, quality_id, created_by_id, creation_date,
                 date, time, description, sample_number, sample_point_id, article_no
-            ) VALUES (
+            )
+            OUTPUT INSERTED.id
+            VALUES (
                 :type_sample, :spec_id, 'PVS', :sample_matrix_id,
                 :product_id, :quality_id, :user_id, :creation_date,
                 :date, :time, :description, :sample_number, :sample_point_id, 0
             )
         """)
 
-        self.db.execute(sql_insert, {
+        result = self.db.execute(sql_insert, {
             'type_sample': type_sample,
             'spec_id': spec_id,
             'sample_matrix_id': sample_matrix_id,
@@ -688,9 +698,15 @@ class SampleLoadingService:
             'sample_point_id': sample_point_id
         })
 
-        # Get inserted sample ID
-        result = self.db.execute(text("SELECT SCOPE_IDENTITY() as id")).first()
-        sample_id = int(result[0])
+        # Get inserted sample ID from OUTPUT clause
+        row = result.first()
+        if row:
+            sample_id = int(row[0]) if row[0] is not None else None
+        else:
+            sample_id = None
+
+        if sample_id is None:
+            raise ValueError("Failed to retrieve inserted sample ID for production sample")
 
         # Insert measurements
         self._insert_measurements(sample_id, limits)

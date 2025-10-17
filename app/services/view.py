@@ -148,7 +148,7 @@ def updatedSpec(db, id, row, cols):
             max_val = None
         idvariable = col[1]['id']  
         if not min_val is None or not max_val is None:                            
-           sql = "INSERT INTO dSpec(spec_id, variable_id, min, max) VALUES( :p1, :p2, :p3, :p4) ; "
+           sql = "INSERT INTO dSpec(spec_id, variable_id, min_value, max_value) VALUES( :p1, :p2, :p3, :p4) ; "
            db.execute(text(sql), {'p1':id, 'p2':idvariable, 'p3':min_val, 'p4':max_val}    )
     db.commit()
 

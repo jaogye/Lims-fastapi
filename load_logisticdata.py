@@ -82,14 +82,22 @@ SessionLocal = sessionmaker(
 db = SessionLocal()
 
 # Fetch all customers from the customer table
-tts = db.execute(text("SELECT customer from customer"))  # List of tuples
-lst_customers = [t[0].strip() for t in tts]
+tts = db.execute(text("""SELECT customer, product_id, quality_id, p.name product, q.name quality 
+                      FROM spec s, product p, quality q
+                      WHERE  s.type_spec='CLI' and s.product_id=p.id AND s.quality_id=q.id"""))  # List of tuples
+lst_customerlist = [( t[0].strip(), t[1], t[2], t[3].strip(), t[4].strip() ) for t in tts]
 
-# Fetch article codes and descriptions from product-quality mappings
-tts = db.execute(text("""SELECT article_code, concat(trim(p.name),' ', trim(q.name)) description
-                      FROM map m, product p, quality q
-                      WHERE m.product_id=p.id and m.quality_id=q.id"""))  # List of tuples
-lst_maps = [(t[0], t[1].strip()) for t in tts]
+# Fetch all customers from the customer table
+tts = db.execute(text("""SELECT article_code, product_id, quality_id 
+                      FROM map ORDER BY product_id, quality_id"""))  # List of tuples
+lst_maps = [t for t in tts]
+dict_maps = {}
+for t in lst_maps:
+    key = str(t[1]) + '_' + str(t[2])
+    if not key in dict_maps:
+        dict_maps[key] = []
+    dict_maps[key].append( t[0] )
+
 
 # Generate date range for test data (June 1 to December 31, 2025)
 lst_dates = create_date_list('2025-06-01', '2025-12-31')
@@ -113,14 +121,16 @@ for date in lst_dates:
 
     for _ in range(n_tot):
         # Randomly select a customer from the list
-        customer = lst_customers[random.randint(0, len(lst_customers) - 1)]
-
+        customer, product_id, quality_id, product, quality = lst_customerlist[random.randint(0, len(lst_customerlist) - 1)]
+        description = product + ' ' + quality
         # Randomly select an article code and description
-        article_code, description = lst_maps[random.randint(0, len(lst_maps) - 1)]
-
+        key = str(product_id) + '_' + str(quality_id)
+        ll = dict_maps[key]
+        article_code = ll[random.randint(0, len(ll) - 1)]
+        
         # Randomly select a loading time
         time = lst_times[random.randint(0, len(lst_times) - 1)]
-
+        
         # Create a row with random data
         row = {
             "date": date,
@@ -134,8 +144,8 @@ for date in lst_dates:
         }
 
         # Insert the generated data into the logisticdata table
-        insert = """INSERT into logisticdata( date,time, name_client,  ordernumber_PVS,  article_no,
-                 ordernumber_client, Description, loading_ton) VALUES (:date, :time,
+        insert = """INSERT into logisticdata( date,time, name_client,  order_number_PVS,  article_no,
+                 order_number_client, Description, loading_ton) VALUES (:date, :time,
                  :customer, :order1, :article_code, :order2, :description, :ton)"""
         result = db.execute(text(insert), row)
         db.commit()
