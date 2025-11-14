@@ -126,7 +126,7 @@ class SampleLoadingService:
     def _insert_measurements(self, sample_id: int, limits: List[Dict]):
         """Insert measurements for a sample with limits from specification"""
         for limit in limits:
-            variable = limit['variable']
+            variable_name = limit['variable']
             variable_id = limit['variable_id']
             min_val = limit.get('min')
             max_val = limit.get('max')
@@ -138,14 +138,14 @@ class SampleLoadingService:
                 max_val = None
 
             sql = text("""
-                INSERT INTO measurement(sample_id, variable_id, variable, min_value, max_value, value)
-                VALUES (:sample_id, :variable_id, :variable, :min_val, :max_val, -1)
+                INSERT INTO measurement(sample_id, variable_id, variable_name, min_value, max_value, value)
+                VALUES (:sample_id, :variable_id, :variable_name, :min_val, :max_val, -1)
             """)
 
             self.db.execute(sql, {
                 'sample_id': sample_id,
                 'variable_id': variable_id,
-                'variable': variable,
+                'variable_name': variable_name,
                 'min_val': min_val,
                 'max_val': max_val
             })
@@ -549,7 +549,8 @@ class SampleLoadingService:
 
         # Get sample matrix entries for this frequency that don't have samples yet
         sql_matrix = text("""
-            SELECT x.*, p.name as Product, q.name as Quality, sp.name as SamplePoint
+            SELECT x.id, x.sample_point_id, x.spec_id, x.product_id, x.quality_id, p.name as Product, 
+                q.name as Quality, sp.name as SamplePoint
             FROM samplematrix x, product p, quality q, samplepoint sp
             WHERE frequency=:frequency
             AND x.product_id=p.id

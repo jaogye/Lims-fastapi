@@ -53,12 +53,10 @@ def convert_numpy_types(obj):
 # This function build the query of the view_name based on the view definitions
 def buildQuery(db, view_name):
     additional_cols = getDnormColumns(db, view_name)
-    col_names = ['action']  # Start with 'action' column
+    label_names = ['action']  # Start with 'action' column
     query = "SELECT ' ' Action "
     From = view[view_name]['table']
     where = ""
-    #table_aliases = {}  # Track table aliases to handle multiple references to the same table
-    #table_counts = {}   # Count occurrences of each table
 
     if 'filter' in view[view_name]:
        for col, value in view[view_name]['filter'].items():
@@ -68,7 +66,7 @@ def buildQuery(db, view_name):
 
     for label, value in view[view_name]['cols'].items():
         column = label
-        col_names.append(column)
+        label_names.append(column)
         if 'column' in value:
             column = value['column']
         if 'fk' in value: # if the column is FK
@@ -81,23 +79,23 @@ def buildQuery(db, view_name):
             column = alias + ".name "
             where = where + view[view_name]['table'] + "." + colFk + " = " + alias + ".id AND "
 
-        query = query + ", " + column + " " + label
+        query = query + ", " + column # + " " + label
     
     for label, value in additional_cols:
-        column = value['column']
-        if label.lower() in ['as', 'in']: # If label crashes with a reserved word in sql
-           label = label + '1'
-        col_names.append(label)
-        query = query + ", " + column + " " + label
+        column = value['column'].lower()
+        if column in ['as', 'in']: # If label crashes with a reserved word in sql
+           column = column + '1'
+        label_names.append(label)
+        query = query + ", " + column # + " " + label
     
     if where != "":
        where = where[0:-4]
     query = query + ", "+ view[view_name]['table'] + ".id "
-    col_names.append('id')  # Add 'id' to match the query
+    label_names.append('id')  # Add 'id' to match the query
     query = query + " FROM " + From
     if where != "":
        query = query + " WHERE " + where
-    return query, col_names
+    return query, label_names
 
 
 
@@ -157,14 +155,14 @@ def updatedSpec(db, id, row, cols):
 # This function updates the detail of specification in dsamplematrix table based on
 # the boolean selections saved in spec for a given id (idspec)
 def updatedSampleMatrix(db, id, row, cols):
-    sql = "DELETE FROM dsamplematrix WHERE samplematrix_id=:id"
+    sql = "DELETE FROM dsamplematrix WHERE sample_matrix_id=:id"
     db.execute(text(sql), {'id':id} )
     db.commit()
     for col in cols:
         min_val = row[col[0].strip().lower()]
         idvariable = col[1]['id']  
         if not min_val is None:                            
-           sql = "INSERT INTO dsamplematrix(samplematrix_id, variable_id) VALUES( :p1, :p2) ; "
+           sql = "INSERT INTO dsamplematrix(sample_matrix_id, variable_id) VALUES( :p1, :p2) ; "
            db.execute(text(sql), {'p1':id, 'p2':idvariable}    )
     db.commit()
 
@@ -211,7 +209,19 @@ def check_customerparam(row):
     # Testing the condition: isNull(COC) ==> COC == "X" or COC == "N" is not held
     if not isNull(coc) and not (coc in [ "X" , "N"]):
        msg = "The COC must be X or null." 
-       return mgs
+       return msg
+
+
+def check_samplematrixparam( db, i, id, row, cols ):
+    msg = ""
+    lst_ids = [ str(col[1]['id']) for col in cols if row[col[0]] is not None]
+    sql = f"""SELECT count(*) cnt FROM dspec WHERE spec_id=:spec_id and variable_id in 
+    ({",".join(lst_ids)})"""
+    result = db.execute(text(sql), {'spec_id':row['spec_id'] })
+    cnt = list(result)
+    if len(lst_ids) != cnt[0][0]:  
+        msg = f"""Action={row['action']}, id {id} row {i}. The tests of samplematrix must be in General Specifications. Number of expected tests {len(lst_ids)} number of found test {cnt[0][0]}"""
+    return msg
 
 
 view = {}
@@ -249,11 +259,11 @@ view['maps']['keys'] = [ ('product', 'quality', 'logistic_info') ] # Unique keys
 
 view['holidays'] = {'table':'holidays', 'order':'date'}
 view['holidays']['cols'] = {}
-view['holidays']['cols']['Date'] = {'p':(str, False) }  # (datatype, IsNull, FKColum, FKTable)
+view['holidays']['cols']['Date'] = {'p':(str, True) }  # (datatype, IsNull, FKColum, FKTable)
 view['holidays']['cols']['Description'] = {'p':(str, True) }
 view['samplematrix'] = {'table':'samplematrix',  
                         'order':'product.name, quality.name, samplepoint.name',
-                        'after': updatedSampleMatrix }
+                        'after': updatedSampleMatrix, 'before':check_samplematrixparam }
 view['samplematrix']['dnorm'] = {}
 view['samplematrix']['dnorm']['variable'] = {
     'query':"""SELECT id, 'str' datatype, 'False' not_null, name name, concat('has_', trim(name) ) col, 
@@ -390,7 +400,7 @@ def checkDataCols(data, colNames, additional_cols):
         col1 = str(data.columns[i]).lower().strip()
         col2 = str(cols[i]).lower().strip()
         if col1 != col2:
-            msg = f"Incorrect order of columns. Expected column: {cols[i]}, but received: {data.columns[i]}"
+            msg = f"Incorrect order of columns. Expected column: {col2}, but received: {col1}"
             ok = False
             return ok, msg
         
@@ -406,6 +416,7 @@ def getDnormColumns(db, view_name, typesql='query'):
             vars = db.execute(text(query))   
             for tt in vars:
                 id, datatype, not_null, label, column, lv, validator, typevar, ord = tt 
+                label = label.strip().lower()
                 validator_name = validator.strip()
                 exec( "p=" + datatype, None, locals() ) 
                 datatype = locals()['p']
@@ -422,8 +433,8 @@ def getDnormColumns(db, view_name, typesql='query'):
                     col_info['lv'] = lv # List of values 
                 
                 # Handle reserved keywords for all cases
-                if label.lower() in ['as', 'in']:
-                    label = label + '1'
+                #if label.lower() in ['as', 'in'] and typesql=='*':
+                #    label = label + '1'
 
                 # Correction of the column
                 if validator_name == 'check_interval' and typesql == 'query':
@@ -482,14 +493,21 @@ def saveView(view_name, db, data):
                 if msg:
                     msgerror.extend(msg)
                     data.loc[i,'action'] =  "*" + Action
-                else:    
+                else:
                     id = checkFK(db, f"SELECT id FROM " + view[view_name]['table'] +" WHERE id=:id", id=id)
                     if id > 0:
                         update = buildUpdateSimple( view_name, additional_cols_dml )
-                        row3 = setAdditionalParameters(db, view_name, row2, action='update')
-                        db.execute(text(update), row3 )
+                        row3 = setAdditionalParameters(view_name, row2, action='update')
+                        if 'before' in view[view_name]:
+                            # For UPDATE, use the existing id instead of trying to get from result
+                            msg = view[view_name]['before'](db, i, id, row3, additional_cols_query)
+                            if msg:
+                                msgerror.append(msg)
+                                data.loc[i,'action'] =  "*" + Action
+                                continue                                
+                        result = db.execute(text(update), row3 )
                         if 'after' in view[view_name]:
-                            new_id = result.scalar()
+                            # For UPDATE, use the existing id instead of trying to get from result
                             view[view_name]['after'](db, id, row3, additional_cols_query)
                         db.commit()
                         nupdated += 1
@@ -505,11 +523,18 @@ def saveView(view_name, db, data):
                 if 'global_check' in view[view_name]:
                     msg = view[view_name]['global_check'](row2)
                 if msg:
-                    msgerror.extend(msg)
+                    msgerror.append(msg)
                     data.loc[i,'action'] =  "*" + Action
                 else:    
                     insert = buildInsertSimple(view_name, additional_cols_dml)
-                    row3 = setAdditionalParameters(db, view_name, row2, action='insert')
+                    row3 = setAdditionalParameters(view_name, row2, action='insert')
+                    if 'before' in view[view_name]:
+                        # For UPDATE, use the existing id instead of trying to get from result
+                        msg = view[view_name]['before'](db, i, id, row3, additional_cols_query)
+                        if msg:
+                            msgerror.extend(msg)
+                            data.loc[i,'action'] =  "*" + Action
+                            continue                                
                     result = db.execute(text(insert), row3)
                     if 'after' in view[view_name]:
                         new_id = result.scalar()
@@ -532,10 +557,10 @@ def saveView(view_name, db, data):
 
 
 # This function sets parameters of derivated columns and filters of the view_name
-def setAdditionalParameters(db, view_name, row2, action='insert'):
+def setAdditionalParameters( view_name, row2, action='insert'):
     if 'filter' in view[view_name]:
         for col, value in view[view_name]['filter'].items():
-                row2[col] = value
+            row2[col] = value
 
     # Add timestamp handling
     current_time = datetime.now()
@@ -552,12 +577,11 @@ def setAdditionalParameters(db, view_name, row2, action='insert'):
 def buildUpdateSimple( view_name, additional_cols ):
     update = "UPDATE " + view[view_name]['table'] + " SET "
     for label, value in view[view_name]['cols'].items():
-        if label.lower() in ['as','in']:
-           label = label + '1'
         column = label
         if 'column' in value:
-            column = value['column']
-    
+            column = value['column'].lower()
+            if column in ['as','in']:
+                column = column + '1'
         if 'fk' in value:
            colFk = value['column']
            update = update + colFk + "=:" + colFk.lower() + ","
@@ -589,69 +613,65 @@ def buildInsertSimple( view_name, additional_cols ):
     insert = "INSERT into " + view[view_name]['table'] + "("
     for label, value in view[view_name]['cols'].items():
         label = label.strip()
-        if label.lower() in ['as','in']:
-           label = label + '1'
         column = label
         if 'column' in value:
-           column = value['column']
-
+           column = value['column'].lower()
+           if column in ['as','in']:
+               column = column + '1'
         if 'fk' in value:
             colFk = value['column']
             insert = insert + colFk + ","
         else:
             insert = insert + column + ","
-
+    
     for label, col_info in additional_cols:
         # Use the actual database column name (not the label)
         insert = insert + col_info['column'] + ","
-
+    
     # Add denormalized columns (dcols)
     if 'dcols' in view[view_name]:
         for dcol_name, dcol_def in view[view_name]['dcols'].items():
             insert = insert + dcol_name + ","
-
+    
     if 'filter' in view[view_name]:
         for col, value in view[view_name]['filter'].items():
             insert = insert + col + ","
-
+    
     # Add created_at and updated_at columns
     insert = insert + "created_at,updated_at,"
-
+    
     insert = insert[0:-1] + ") "
-
+    
     # Add OUTPUT clause for SQL Server to return the inserted ID when 'after' callback is present
     if 'after' in view[view_name]:
         insert = insert + "OUTPUT inserted.id "
-
+    
     insert = insert + "VALUES( "
     for label, value in view[view_name]['cols'].items():
-        label = label.strip()
-        if label.lower() in ['as','in']:
-           label = label + '1'
-
+        label = label.strip()    
         if 'fk' in value:
             colFk = value['column']
             insert = insert + ":" + colFk.lower() + ","
         else:
             insert = insert + ":" + label.lower() + ","
-
+    
     for label, col_info in additional_cols:
         # Use the label (which may have '1' suffix for reserved keywords) for bind parameter
         param_name = label.lower()
         insert = insert + ":" + param_name + ","
-
+    
     # Add denormalized columns (dcols) values
     if 'dcols' in view[view_name]:
         for dcol_name, dcol_def in view[view_name]['dcols'].items():
             insert = insert + ":" + dcol_name.lower() + ","
-
+    
     if 'filter' in view[view_name]:
         for col, value in view[view_name]['filter'].items():
             insert = insert + ":" + col.lower() + ","
-
+    
     # Add created_at and updated_at values
     insert = insert + ":created_at,:updated_at,"
-
+    
     insert = insert[0:-1] + ")"
     return insert
 
@@ -661,7 +681,7 @@ def validateView(view_name, i, db, row, additional_cols):
     id = int(row['id'] )
     Action = row['action'].strip()
     id2 = 0
-    row2={}
+    row2={'action':Action}
     if Action == "U" and id ==0:
        msgerror.append(f"Action={Action}, id {id} row {i}. id must be not null")
        return row2, id2, msgerror
@@ -686,10 +706,7 @@ def validateView(view_name, i, db, row, additional_cols):
     for col, value in cols:
         colinfo = value['p']
         label = col 
-        key = label.lower()
-        if key in ['as', 'in']: # If label crashes with a reserved word in sql
-           label = label + '1'
-    
+        key = label.lower()        
         if  colinfo[1]: # if the column is not null
             if isNull(row[key]): 
               msgerror.append(f"Action={Action}, row {i}. {label} must not be null.")
@@ -698,7 +715,6 @@ def validateView(view_name, i, db, row, additional_cols):
         if 'validator' in value:
             validator = value['validator']
             # Get the actual database column name from col_info (already has min_/max_ prefix)
-            db_column = value['column']
             if isinstance(row[key], str):
                 ss = row[key].replace(' ','')
                 exec( "msg = " + validator + "(label, ss)" ,  globals(), locals() )
@@ -833,9 +849,9 @@ def validateView(view_name, i, db, row, additional_cols):
 
 
 def getView(db, view_name):
-    query, col_names = buildQuery(db, view_name)
+    query, label_names = buildQuery(db, view_name)
     tts = db.execute(text(query)) # List of tuples
-    dict_list = [convert_numpy_types(dict(zip(col_names, t))) for t in tts]
+    dict_list = [convert_numpy_types(dict(zip(label_names, t))) for t in tts]
     if len(dict_list) == 0:
-        dict_list.append( dict.fromkeys(col_names) )
+        dict_list.append( dict.fromkeys(label_names) )
     return dict_list    
