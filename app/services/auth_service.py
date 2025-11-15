@@ -106,8 +106,9 @@ class AuthService:
             return None, []
 
         # Verify password using MATLAB-style hash comparison
-        #hash_code = self.create_hash_code(username, password)
-        
+        # Combine username and password as per MATLAB getHashCode function
+        combined = f"{username}{password}"
+
         # Strip any padding from the hash (SQL Server pads strings with spaces)
         hash_code = user.hashcode.strip() if user.hashcode else ""
 
@@ -116,7 +117,7 @@ class AuthService:
             return None, []
 
         try:
-            if not pwd_context.verify(password, hash_code):
+            if not pwd_context.verify(combined, hash_code):
                 return None, []
         except ValueError as e:
             # Log error but don't reveal to client
@@ -134,9 +135,45 @@ class AuthService:
             .join(UserOption)
             .filter(UserOption.user_id == user_id)
         )
-        
+
         options = [option.name.strip() for option in options_query.all()]
         return options
+
+    async def change_password(self, username: str, new_password: str) -> bool:
+        """
+        Change a user's password.
+
+        Creates a new hash using MATLAB-style username+password combination
+        and updates the user's hashcode in the database.
+
+        Args:
+            username (str): User's username/code.
+            new_password (str): New plain text password.
+
+        Returns:
+            bool: True if password was successfully changed, False otherwise.
+        """
+        username = username.strip()
+
+        # Get user from database
+        user = self.db.query(User).filter(User.code == username).first()
+        if not user:
+            return False
+
+        # Create new hash using MATLAB-style combination
+        new_hash_code = self.create_hash_code(username, new_password)
+
+        # Update user's hashcode
+        user.hashcode = new_hash_code
+        user.updated_at = datetime.utcnow()
+
+        try:
+            self.db.commit()
+            return True
+        except Exception as e:
+            self.db.rollback()
+            print(f"Error changing password for user {username}: {e}")
+            return False
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         to_encode = data.copy()
