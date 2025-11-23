@@ -33,8 +33,8 @@ class Spec(BaseModel):
         day_coa (str): Daily Certificate of Analysis requirement.
         visual (str): Visual inspection notes.
         coc (str): Certificate of Conformity requirement.
-        coa (Decimal): Certificate of Analysis configuration.
-        customer (Decimal): Customer reference number.
+        coa (str): Certificate of Analysis indicator (X/N).
+        customer (str): Customer name.
         tds (str): Technical Data Sheet reference.
         min_* (Decimal): Minimum values for various chemical parameters and trace elements.
         max_* (Decimal): Maximum values for various chemical parameters and trace elements.
@@ -57,21 +57,21 @@ class Spec(BaseModel):
     day_coa = Column(String(1), nullable=True)
     visual = Column(String(60), nullable=True)
     coc = Column(String(1), nullable=True)
-    coa = Column(Numeric(12, 6), nullable=True)
-    customer = Column(Numeric(12, 6), nullable=True)
+    coa = Column(String(1), nullable=True)
+    customer = Column(String(60), nullable=True)
     tds = Column(String(20), nullable=True)
     
     # Chemical limits - minimum values
     min_conc = Column(Numeric(12, 6), nullable=True)
     min_free_so3 = Column(Numeric(12, 6), nullable=True)
     min_free_hcl = Column(Numeric(12, 6), nullable=True)
-    min_ph = Column(Numeric(12, 6), nullable=True)
+    #min_ph = Column(Numeric(12, 6), nullable=True)
     min_nh3 = Column(Numeric(12, 6), nullable=True)
     min_ats = Column(Numeric(12, 6), nullable=True)
     min_densiteit = Column(Numeric(12, 6), nullable=True)
     min_ntu = Column(Numeric(12, 6), nullable=True)
     min_particulate_matter = Column(Numeric(12, 6), nullable=True)
-    min_kleur = Column(Numeric(12, 6), nullable=True)
+    #min_kleur = Column(Numeric(12, 6), nullable=True)
     min_so3 = Column(Numeric(12, 6), nullable=True)
     min_so2 = Column(Numeric(12, 6), nullable=True)
     min_cl = Column(Numeric(12, 6), nullable=True)
@@ -124,13 +124,13 @@ class Spec(BaseModel):
     max_conc = Column(Numeric(12, 6), nullable=True)
     max_free_so3 = Column(Numeric(12, 6), nullable=True)
     max_free_hcl = Column(Numeric(12, 6), nullable=True)
-    max_ph = Column(Numeric(12, 6), nullable=True)
+    #max_ph = Column(Numeric(12, 6), nullable=True)
     max_nh3 = Column(Numeric(12, 6), nullable=True)
     max_ats = Column(Numeric(12, 6), nullable=True)
     max_densiteit = Column(Numeric(12, 6), nullable=True)
     max_ntu = Column(Numeric(12, 6), nullable=True)
     max_particulate_matter = Column(Numeric(12, 6), nullable=True)
-    max_kleur = Column(Numeric(12, 6), nullable=True)
+    #max_kleur = Column(Numeric(12, 6), nullable=True)
     max_so3 = Column(Numeric(12, 6), nullable=True)
     max_so2 = Column(Numeric(12, 6), nullable=True)
     max_cl = Column(Numeric(12, 6), nullable=True)

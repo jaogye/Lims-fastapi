@@ -14,7 +14,7 @@ from passlib.context import CryptContext
 from app.core.config import settings
 from app.models.user import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"])
 
 def fix_user_hash(username: str, password: str):
     """Fix the hash for a specific user"""

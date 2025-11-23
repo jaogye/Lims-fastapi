@@ -86,10 +86,10 @@ class SampleService:
                 "sample_point": sample.sample_point.name if sample.sample_point else "",
                 "sample_date": sample.date.strip(),
                 "sample_time": sample.time.strip(),
-                "remark": sample.remark.strip(),
-                "coa": sample.coa,
-                "day_coa": sample.day_coa,
-                "coc": sample.coc,
+                "remark": sample.remark.strip() if sample.remark else "",
+                "coa": sample.coa if sample.coa else "",
+                "day_coa": sample.day_coa if sample.day_coa else "",
+                "coc": sample.coc if sample.coc else "",
                 "type_sample": sample.type_sample
             }
             result.append(sample_dict)
@@ -276,40 +276,50 @@ class SampleService:
         
         return measurement
 
-    async def refresh_sample_specifications(self, sample_id: int):
+    async def refresh_sample_specifications(self, sample_number: str):
         """
         Refresh sample measurements based on current specifications.
 
         Regenerates measurements for a sample if specifications have changed.
 
         Args:
-            sample_id (int): The ID of the sample to refresh.
+            sample_number (str): The sample number to refresh.
 
         Raises:
             ValueError: If the sample is not found.
         """
-        sample = self.db.query(Sample).filter(Sample.id == sample_id).first()
+        sample = self.db.query(Sample).filter(Sample.sample_number == sample_number).first()
 
         if not sample:
-            raise ValueError(f"Sample {sample_id} not found")
+            raise ValueError(f"Sample {sample_number} not found")
 
         # Refresh measurements based on current specifications
-        await self._generate_sample_measurements(sample)
-
-    async def get_sample_completion_status(self, sample_id: int) -> Dict[str, Any]:
+        measurement = await self._generate_sample_measurements(sample)
+        return measurement
+    
+    async def get_sample_completion_status(self, sample_number: str) -> Dict[str, Any]:
         """
         Calculate sample testing completion status.
 
         Args:
-            sample_id (int): The ID of the sample.
+            sample_number (str): The number of the sample.
 
         Returns:
             Dict[str, Any]: Dictionary containing total_measurements, completed_measurements,
                 completion_percentage, and is_complete flag.
         """
+        sample = (
+            self.db.query(Sample)
+            .filter(Sample.sample_number == sample_number)
+            .first()
+        )
+
+        if not sample:
+            raise ValueError(f"Sample {sample_number} not found")
+
         measurements = (
             self.db.query(Measurement)
-            .filter(Measurement.sample_id == sample_id)
+            .filter(Measurement.sample_id == sample.id)
             .all()
         )
 
@@ -323,7 +333,7 @@ class SampleService:
         )
 
         return {
-            "sample_id": sample_id,
+            "sample_number": sample_number,
             "total_measurements": total_measurements,
             "completed_measurements": completed_measurements,
             "completion_percentage": round(completion_percentage, 2),
@@ -333,20 +343,20 @@ class SampleService:
     async def _generate_sample_number(self, type_sample: str) -> str:
         """
         Generate unique sample number.
-
+    
         Creates a unique sample number in the format: {TYPE}{YYYYMMDD}{SEQUENCE}
         where SEQUENCE is a 3-digit counter for samples of this type on this date.
-
+    
         Args:
             type_sample (str): Sample type (PRO, CLI, MAN).
-
+    
         Returns:
             str: Generated unique sample number.
         """
         # Generate unique sample number based on type and date
         today = datetime.now()
         date_str = today.strftime("%Y%m%d")
-
+    
         # Count samples of this type today
         count = (
             self.db.query(Sample)
@@ -358,31 +368,34 @@ class SampleService:
             )
             .count()
         )
-
+    
         sequence = f"{count + 1:03d}"
         return f"{type_sample}{date_str}{sequence}"
-
+    
+     
     async def _generate_sample_measurements(self, sample: Sample):
         """
         Generate measurements for a sample based on its type.
-
+        
         Routes to appropriate measurement generation method based on sample type:
         - PRO: Uses sample matrix configuration
         - CLI: Uses customer-specific specification
         - MAN: Uses general specification
-
+        
         Args:
             sample (Sample): The sample object to generate measurements for.
         """
         if sample.type_sample == "PRO":
             # Production sample - use SampleMatrix
-            await self._generate_production_measurements(sample)
+            measurement = await self._generate_production_measurements(sample)
         elif sample.type_sample == "CLI":
             # Customer sample - use customer specification
-            await self._generate_customer_measurements(sample)
+            measurement = await self._generate_customer_measurements(sample)
         elif sample.type_sample == "MAN":
             # Manual sample - use general specification
-            await self._generate_manual_measurements(sample)
+            measurement = await self._generate_manual_measurements(sample)
+        
+        return measurement 
 
     async def _generate_production_measurements(self, sample: Sample):
         """
@@ -406,20 +419,21 @@ class SampleService:
             )
             .first()
         )
-
+        
         if not sample_matrix:
             logger.warning(f"No sample matrix found for sample {sample.id}")
             return
-
+        
         # Create measurements based on sample matrix flags
-        await self._create_measurements_from_matrix(sample, sample_matrix)
+        measurement = await self._create_measurements_from_matrix(sample, sample_matrix)
+        return measurement
 
     async def _generate_customer_measurements(self, sample: Sample):
         """
         Generate measurements for customer samples.
-
+        
         Uses customer-specific specification to determine required tests.
-
+        
         Args:
             sample (Sample): The customer sample object.
         """
@@ -431,21 +445,23 @@ class SampleService:
                     Spec.type_spec == "CLI",
                     Spec.product_id == sample.product_id,
                     Spec.quality_id == sample.quality_id,
-                    Spec.customer == sample.customer
+                    Spec.customer == sample.customer.strip()
                 )
             )
             .first()
         )
-
+        measurement = None
         if spec:
-            await self._create_measurements_from_spec(sample, spec)
+            measurement = await self._create_measurements_from_spec(sample, spec)
+        
+        return measurement     
 
     async def _generate_manual_measurements(self, sample: Sample):
         """
         Generate measurements for manual samples.
-
+        
         Uses general specification to determine required tests.
-
+        
         Args:
             sample (Sample): The manual sample object.
         """
@@ -461,14 +477,17 @@ class SampleService:
             )
             .first()
         )
-
+        
         if spec:
-            await self._create_measurements_from_spec(sample, spec)
+            measurement = await self._create_measurements_from_spec(sample, spec)
+        
+        return measurement    
+
 
     async def _create_measurements_from_matrix(self, sample: Sample, matrix: SampleMatrix):
         """
         Create measurement records based on sample matrix configuration.
-
+    
         Placeholder method for creating measurements based on boolean flags
         in the sample matrix that indicate which tests should be performed.
 
@@ -484,13 +503,70 @@ class SampleService:
         """
         Create measurement records based on specification limits.
 
-        Placeholder method for creating measurements for variables that have
-        limits defined in the specification.
+        Retrieves and processes measurements for a sample, adding string representations
+        and handling special cases like less-than values and missing limits.
 
         Args:
             sample (Sample): The sample object.
             spec (Spec): The specification object with defined limits.
+
+        Returns:
+            List[Dict[str, Any]]: List of processed measurement dictionaries with formatted values.
         """
-        # This would create measurements based on the specification limits
-        # Implementation would create measurements for variables that have limits defined
-        pass
+        # Query measurements joined with sample and variable, ordered by variable.ord
+        measurements = (
+            self.db.query(Measurement)
+            .join(Variable, Measurement.variable_id == Variable.id)
+            .join(Sample, Measurement.sample_id == Sample.id)
+            .filter(Sample.sample_number == sample.sample_number)
+            .order_by(Variable.ord)
+            .all()
+        )
+
+        # Process measurements to create formatted result
+        result = []
+        for measurement in measurements:
+            # Get variable information
+            variable = (
+                self.db.query(Variable)
+                .filter(Variable.id == measurement.variable_id)
+                .first()
+            )
+
+            # Initialize str_value
+            str_value = ""
+
+            # Convert value to string representation
+            if measurement.value is not None and measurement.value != -1:
+                # If less flag is set, prepend "<"
+                if measurement.less:
+                    str_value = f"<{float(measurement.value)}"
+                else:
+                    str_value = str(float(measurement.value))
+            # If value is -1 or None, str_value remains empty
+
+            # Handle missing min/max values
+            min_value = float(measurement.min_value) if measurement.min_value is not None else float('-inf')
+            max_value = float(measurement.max_value) if measurement.max_value is not None else float('inf')
+
+            # Create measurement dictionary
+            measurement_dict = {
+                "sample_number": sample.sample_number.strip(),
+                "id": measurement.id,
+                "sample_id": measurement.sample_id,
+                "variable_id": measurement.variable_id,
+                "variable": measurement.variable,
+                "value": float(measurement.value) if measurement.value is not None else None,
+                "min_value": min_value,
+                "max_value": max_value,
+                "str_value": str_value,
+                "less": measurement.less if measurement.less is not None else False,
+                "test_date": measurement.test_date,
+                "tested_by_id": measurement.tested_by_id,
+                "typevar": variable.typevar if variable else None,
+                "modified": 0  # Default value as in MATLAB code
+            }
+
+            result.append(measurement_dict)
+
+        return result

@@ -78,86 +78,6 @@ async def get_samples(
     return samples
 
 
-@router.post("/", response_model=SampleResponse)
-async def create_sample(
-    sample_data: SampleCreateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    sample = await sample_service.create_sample(sample_data, current_user.id)
-    return sample
-
-
-@router.get("/{sample_id}", response_model=SampleResponse)
-async def get_sample(
-    sample_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    sample = await sample_service.get_sample_by_id(sample_id)
-    
-    if not sample:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Sample not found"
-        )
-    
-    return sample
-
-
-@router.get("/{sample_id}/measurements", response_model=List[MeasurementResponse])
-async def get_sample_measurements(
-    sample_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    measurements = await sample_service.get_sample_measurements(sample_id)
-    return measurements
-
-
-@router.post("/{sample_id}/measurements")
-async def add_measurement(
-    sample_id: int,
-    variable: str,
-    value: float,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    measurement = await sample_service.add_measurement(
-        sample_id=sample_id,
-        variable=variable,
-        value=value,
-        tested_by_id=current_user.id
-    )
-    return {"message": "Measurement added successfully", "id": measurement.id}
-
-
-@router.post("/{sample_id}/refresh")
-async def refresh_sample_specifications(
-    sample_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    await sample_service.refresh_sample_specifications(sample_id)
-    return {"message": "Sample specifications refreshed successfully"}
-
-
-@router.get("/{sample_id}/status")
-async def get_sample_status(
-    sample_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    sample_service = SampleService(db)
-    status_info = await sample_service.get_sample_completion_status(sample_id)
-    return status_info
-
-
 @router.post("/load-customer-samples")
 async def load_customer_samples(
     sample_date: str = Query(..., description="Sample date in YYYY-MM-DD format"),
@@ -181,7 +101,7 @@ async def load_customer_samples(
         sample_date=sample_date,
         user_id=current_user.id
     )
-
+    
     if not result['success'] and result.get('errors'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -191,7 +111,7 @@ async def load_customer_samples(
                 "pending_data": result.get('pending_data')
             }
         )
-
+    
     return {
         "message": result['message'],
         "success": result['success'],
@@ -237,3 +157,163 @@ async def load_production_samples(
         "success": result['success'],
         "errors": result.get('errors')
     }
+
+
+@router.post("/create-sample")
+async def create_sample(
+    sample_date: str = Query(..., description="Sample date in YYYY-MM-DD format"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Combined endpoint that loads both customer and production samples for the specified date.
+
+    This endpoint:
+    - First loads customer samples from logistic data
+    - Then generates production samples based on sample matrix and frequency
+    - Returns combined results from both operations
+
+    Args:
+        sample_date: Date in YYYY-MM-DD format for which to load samples
+
+    Returns:
+        Combined results containing success status, messages, and any errors from both operations
+    """
+    loading_service = SampleLoadingService(db)
+
+    # Load customer samples
+    customer_result = await loading_service.load_customer_samples(
+        sample_date=sample_date,
+        user_id=current_user.id
+    )
+
+    # Load production samples
+    production_result = await loading_service.load_production_samples(
+        sample_date=sample_date,
+        user_id=current_user.id
+    )
+
+    # Combine results
+    combined_success = customer_result['success'] and production_result['success']
+    combined_errors = []
+
+    if customer_result.get('errors'):
+        combined_errors.extend([f"Customer: {err}" for err in customer_result['errors']])
+
+    if production_result.get('errors'):
+        combined_errors.extend([f"Production: {err}" for err in production_result['errors']])
+
+    response = {
+        "message": "Combined sample loading completed",
+        "success": combined_success,
+        "customer_result": {
+            "message": customer_result['message'],
+            "success": customer_result['success'],
+            "errors": customer_result.get('errors'),
+            "pending_data": customer_result.get('pending_data')
+        },
+        "production_result": {
+            "message": production_result['message'],
+            "success": production_result['success'],
+            "errors": production_result.get('errors')
+        }
+    }
+
+    if combined_errors:
+        response["combined_errors"] = combined_errors
+
+    # Raise exception if both operations failed
+    if not combined_success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=response
+        )
+
+    return response
+
+
+@router.post("/{sample_number}/refresh")
+async def refresh_sample_specifications(
+    sample_number: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    measurement = await sample_service.refresh_sample_specifications(sample_number)
+    return {"message": "Sample specifications refreshed successfully", "measurement":measurement}
+
+
+@router.get("/{sample_number}/status")
+async def get_sample_status(
+    sample_number: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    status_info = await sample_service.get_sample_completion_status(sample_number)
+    return status_info
+
+
+
+"""
+
+@router.post("/", response_model=SampleResponse)
+async def create_sample(
+    sample_data: SampleCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    sample = await sample_service.create_sample(sample_data, current_user.id)
+    return sample
+
+
+
+@router.get("/{sample_number}", response_model=SampleResponse)
+async def get_sample(
+    sample_number: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    sample = await sample_service.get_sample_by_id(sample_number)
+
+    if not sample:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sample not found"
+        )
+
+    return sample
+
+
+@router.get("/{sample_number}/measurements", response_model=List[MeasurementResponse])
+async def get_sample_measurements(
+    sample_number: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    measurements = await sample_service.get_sample_measurements(sample_number)
+    return measurements
+
+
+@router.post("/{sample_number}/measurements")
+async def add_measurement(
+    sample_number: str,
+    variable: str,
+    value: float,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    sample_service = SampleService(db)
+    measurement = await sample_service.add_measurement(
+        sample_number=sample_number,
+        variable=variable,
+        value=value,
+        tested_by_id=current_user.id
+    )
+    return {"message": "Measurement added successfully", "id": measurement.id}
+
+
+"""

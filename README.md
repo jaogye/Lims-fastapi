@@ -152,11 +152,15 @@ LOG_LEVEL=INFO
 - `GET /auth/me` - Get current user info
 
 ### Samples
-- `GET /api/samples` - List samples
-- `POST /api/samples` - Create new sample
-- `GET /api/samples/{id}` - Get sample details
-- `GET /api/samples/{id}/measurements` - Get sample measurements
-- `POST /api/samples/{id}/measurements` - Add measurement
+- `GET /api/samples` - List samples (with optional filters)
+- `POST /api/samples/create-sample` - Create samples for a specific date
+- `POST /api/samples/load-customer-samples` - Load customer samples from logistic data
+- `POST /api/samples/load-production-samples` - Generate production samples based on matrix
+- `POST /api/samples/{sample_number}/refresh` - Refresh sample specifications
+- `GET /api/samples/{sample_number}/status` - Get sample completion status
+- `GET /api/samples/{sample_number}` - Get sample details
+- `GET /api/samples/{sample_number}/measurements` - Get sample measurements
+- `POST /api/samples/{sample_number}/measurements` - Add measurement
 
 ### Reports
 - `GET /api/reports/coa/{sample_id}` - Generate COA report
@@ -307,14 +311,23 @@ All Python files in this project include comprehensive docstrings following PEP 
 - `app/core/` - Configuration and security utilities
 - `app/database/` - Database connection and session management
 
+## Recent Changes
+
+### API Endpoint Updates (Latest)
+- **Sample Endpoints**: Changed route parameter from `{sample_id}` to `{sample_number}` for consistency
+  - All sample endpoints now use the sample number (string) instead of internal ID
+  - Affected endpoints: `/refresh`, `/status`, `/measurements`, and sample details
+  - This change aligns the API with the business domain model where samples are identified by their sample number
+
 ## Project Status
 
 This is an active development project migrating from MATLAB to FastAPI. Current features include:
-- Core sample management
+- Core sample management with automated loading from logistic data
+- Sample generation based on frequency matrix (daily, weekly, monthly, quarterly, semester)
 - Report generation (COA, COC, certificates)
-- User authentication with JWT
+- User authentication with JWT and password hashing
 - Master data management via Excel import/export
-- Logistic data integration
+- Logistic data integration for customer samples
 
 ## Support
 

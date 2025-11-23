@@ -18,7 +18,7 @@ from ..models.user import User, UserOption, OptionMenu
 from ..core.config import settings
 from ..database.connection import get_db
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"])
 security = HTTPBearer()
 
 
@@ -89,7 +89,7 @@ class AuthService:
     ) -> Tuple[Optional[User], List[str]]:
         """
         Validate user credentials and retrieve user options.
-
+    
         Args:
             username (str): User's username/code.
             password (str): User's plain text password.
@@ -154,19 +154,19 @@ class AuthService:
             bool: True if password was successfully changed, False otherwise.
         """
         username = username.strip()
-
+        
         # Get user from database
         user = self.db.query(User).filter(User.code == username).first()
         if not user:
             return False
-
+        
         # Create new hash using MATLAB-style combination
         new_hash_code = self.create_hash_code(username, new_password)
-
+        
         # Update user's hashcode
         user.hashcode = new_hash_code
         user.updated_at = datetime.utcnow()
-
+        
         try:
             self.db.commit()
             return True
@@ -174,7 +174,7 @@ class AuthService:
             self.db.rollback()
             print(f"Error changing password for user {username}: {e}")
             return False
-
+      
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None):
         to_encode = data.copy()
         
@@ -193,7 +193,7 @@ class AuthService:
         )
         
         return encoded_jwt
-
+    
     async def get_current_user(self, token: str) -> Optional[User]:
         credentials_exception = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -214,14 +214,14 @@ class AuthService:
                 
         except JWTError:
             raise credentials_exception
-
+    
         user = self.db.query(User).filter(User.code == username).first()
         
         if user is None:
             raise credentials_exception
             
         return user
-
+    
     def is_active_user(self, user: User) -> bool:
         return user.status
 

@@ -30,7 +30,7 @@ from sqlalchemy import text
 import logging
 import sys
 
-from app.core.config import settings
+from app.core.config  import settings
 from app.database.connection import get_db, test_connection, create_tables
 from app.api import auth, samples, reports, master_data
 
@@ -57,24 +57,24 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     Manage the application lifespan (startup and shutdown events).
-
+    
     Startup tasks:
         - Test database connection
         - Initialize database tables
         - Log application startup
-
+    
     Shutdown tasks:
         - Log application shutdown
         - Clean up resources
     """
     # Startup phase
     logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
-
+    
     # Test database connection
     if not test_connection():
         logger.error("Database connection failed")
         raise Exception("Cannot connect to database")
-
+    
     # Create tables if they don't exist (skip if error occurs)
     try:
         create_tables()
@@ -82,11 +82,11 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Could not create tables automatically: {e}")
         logger.info("Tables may already exist or need manual creation")
-
+    
     logger.info("Application startup completed")
-
+    
     yield
-
+    
     # Shutdown phase
     logger.info("Shutting down application")
 
@@ -124,7 +124,7 @@ app.add_middleware(
 async def validation_exception_handler(request, exc):
     """
     Handle request validation errors.
-
+    
     Returns a structured JSON response with validation error details.
     """
     return JSONResponse(
@@ -140,7 +140,7 @@ async def validation_exception_handler(request, exc):
 async def http_exception_handler(request, exc):
     """
     Handle standard HTTP exceptions.
-
+    
     Returns a structured JSON response with HTTP error details.
     """
     return JSONResponse(

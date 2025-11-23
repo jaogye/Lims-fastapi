@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Any, Union
 from .config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"])
 
 
 def create_access_token(

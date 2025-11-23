@@ -6,7 +6,9 @@ This will help fix the malformed hash issue.
 
 from passlib.context import CryptContext
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+#pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+pwd_context = CryptContext(schemes=["bcrypt"])
 
 def generate_hash(password: str) -> str:
     """Generate a proper bcrypt hash for the given password."""

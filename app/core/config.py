@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     Centralizes all application configuration with support for environment
     variables, type validation, and computed properties. Settings can be
     overridden via .env file.
-
+    
     Attributes:
         APP_NAME (str): Application name.
         SECRET_KEY (str): Secret key for JWT token signing.
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-
+    
     # Database Settings
     DATABASE_URL: Optional[str] = None
     DATABASE_HOST: str = "localhost"
@@ -107,7 +107,7 @@ class Settings(BaseSettings):
             f"@{self.DATABASE_HOST}:{self.DATABASE_PORT}/{self.DATABASE_NAME}"
             f"?driver={self.DATABASE_DRIVER.replace(' ', '+')}"
         )
-
+    
     def ensure_directories(self):
         """Create necessary directories if they don't exist"""
         directories = [
@@ -120,7 +120,7 @@ class Settings(BaseSettings):
         
         for directory in directories:
             os.makedirs(directory, exist_ok=True)
-
+    
     model_config = {
         "env_file": ".env",
         "case_sensitive": True,

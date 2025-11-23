@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 from ..models.sample import Sample, Measurement
-from ..models.laboratory import Product, Quality, SamplePoint
+from ..models.laboratory import Product, Quality, SamplePoint, Variable
 from ..models.user import User
 
 
@@ -46,7 +46,7 @@ class ReportService:
 
     async def generate_coa_report(
         self,
-        sample_id: int,
+        sample_number: str,
         username: str,
         filename: Optional[str] = None
     ) -> str:
@@ -57,7 +57,7 @@ class ReportService:
         and measurements with pass/fail status based on specification limits.
 
         Args:
-            sample_id (int): ID of the sample to report on.
+            sample_number (str): Number of the sample to report on.
             username (str): Name of the user generating the report.
             filename (Optional[str]): Custom filename for the PDF. Auto-generated if None.
 
@@ -68,14 +68,14 @@ class ReportService:
             ValueError: If the sample is not found.
         """
         # Get sample data with all related information
-        sample = await self._get_sample_with_measurements(sample_id)
+        sample = await self._get_sample_with_measurements(sample_number)
         
         if not sample:
-            raise ValueError(f"Sample {sample_id} not found")
+            raise ValueError(f"Sample {sample_number} not found")
 
         # Create temporary PDF file
         if not filename:
-            filename = f"COA_{sample_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"COA_{sample_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
         temp_dir = tempfile.mkdtemp()
         pdf_path = os.path.join(temp_dir, filename)
@@ -115,7 +115,7 @@ class ReportService:
 
     async def generate_coc_report(
         self,
-        sample_id: int,
+        sample_number: str,
         username: str,
         filename: Optional[str] = None
     ) -> str:
@@ -126,7 +126,7 @@ class ReportService:
         with sample information and conformity statement.
 
         Args:
-            sample_id (int): ID of the sample to report on.
+            sample_number (str): Numbrer of the sample to report on.
             username (str): Name of the user generating the report.
             filename (Optional[str]): Custom filename for the PDF. Auto-generated if None.
 
@@ -137,13 +137,13 @@ class ReportService:
             ValueError: If the sample is not found.
         """
         # Similar to COA but with COC-specific formatting
-        sample = await self._get_sample_with_measurements(sample_id)
+        sample = await self._get_sample_with_measurements(sample_number)
         
         if not sample:
-            raise ValueError(f"Sample {sample_id} not found")
+            raise ValueError(f"Sample {sample_number} not found")
 
         if not filename:
-            filename = f"COC_{sample_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            filename = f"COC_{sample_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
         
         temp_dir = tempfile.mkdtemp()
         pdf_path = os.path.join(temp_dir, filename)
@@ -168,50 +168,73 @@ class ReportService:
 
     async def generate_day_certificate_report(
         self,
-        report_date: str,
+        sample_number: str,
         username: str
     ) -> str:
         """
-        Generate a daily certificate report for all samples on a given date.
+        Generate a day certificate report for a specific sample.
 
-        Creates a landscape PDF with a summary table of all samples collected
-        on the specified date.
+        Creates a portrait PDF with company header, sample information,
+        measurements table, and signature section matching the template format.
 
         Args:
-            report_date (str): Date for the report (YYYY-MM-DD format).
+            sample_number (str): Sample number for the report.
             username (str): Name of the user generating the report.
 
         Returns:
             str: Path to the generated PDF file.
         """
-        # Get all samples for the specified date
-        samples = await self._get_samples_by_date(report_date)
-        
-        filename = f"DayCertificate_{report_date}.pdf"
+        # Get sample data
+        sample_data = await self._get_COA_Data(sample_number)
+
+        if not sample_data:
+            raise ValueError(f"Sample {sample_number} not found")
+
+        filename = f"DayCertificate_{sample_number}.pdf"
         temp_dir = tempfile.mkdtemp()
         pdf_path = os.path.join(temp_dir, filename)
 
-        doc = SimpleDocTemplate(pdf_path, pagesize=landscape(A4))
+        doc = SimpleDocTemplate(
+            pdf_path,
+            pagesize=A4,
+            rightMargin=0.5*inch,
+            leftMargin=0.5*inch,
+            topMargin=0.5*inch,
+            bottomMargin=0.5*inch
+        )
         content = []
-        
+
+        # Add company header
+        content.extend(await self._create_day_certificate_header())
+
         # Add title
         title_style = ParagraphStyle(
-            'CustomTitle',
+            'DayTitle',
             parent=self.styles['Heading1'],
-            fontSize=18,
-            spaceAfter=30,
-            alignment=1  # Center alignment
+            fontSize=14,
+            spaceAfter=20,
+            spaceBefore=10,
+            alignment=0  # Left alignment
         )
-        
-        content.append(Paragraph(f"Daily Certificate Report - {report_date}", title_style))
-        
-        # Add samples summary table
-        content.extend(await self._create_daily_summary_table(samples))
+        content.append(Paragraph("Day Certificate", title_style))
+        content.append(Spacer(1, 0.3*inch))
+
+        # Add sample information
+        content.extend(await self._create_day_certificate_sample_info(sample_data))
+
+        # Add spacer
+        content.append(Spacer(1, 0.3*inch))
+
+        # Add measurements table
+        content.extend(await self._create_day_certificate_measurements_table(sample_data))
+
+        # Add footer with quality control note and signatures
+        content.extend(await self._create_day_certificate_footer(username))
 
         doc.build(content)
         return pdf_path
 
-    async def _get_sample_with_measurements(self, sample_id: int) -> Optional[Dict[str, Any]]:
+    async def _get_sample_with_measurements(self, sample_number: str) -> Optional[Dict[str, Any]]:
         sample = (
             self.db.query(Sample)
             .options(
@@ -221,7 +244,7 @@ class ReportService:
                 joinedload(Sample.created_by),
                 joinedload(Sample.measurements)
             )
-            .filter(Sample.id == sample_id)
+            .filter(Sample.sample_number == sample_number)
             .first()
         )
 
@@ -243,7 +266,8 @@ class ReportService:
             "loading_ton": float(sample.loading_ton) if sample.loading_ton else None,
             "measurements": [
                 {
-                    "variable": m.variable,
+                    "variable": m.variable.name if m.variable else "",
+                    "unit": m.variable.unit if m.variable else "",
                     "value": float(m.value) if m.value else None,
                     "min_value": float(m.min_value) if m.min_value else None,
                     "max_value": float(m.max_value) if m.max_value else None,
@@ -252,30 +276,101 @@ class ReportService:
                 for m in sample.measurements
             ]
         }
+        
+    async def _get_COA_Data(self, sample_number: str) -> Dict[str, Any]:
+        """
+        Get Certificate of Analysis data for a sample.
 
-    async def _get_samples_by_date(self, report_date: str) -> List[Dict[str, Any]]:
-        samples = (
-            self.db.query(Sample)
-            .options(
-                joinedload(Sample.product),
-                joinedload(Sample.quality),
-                joinedload(Sample.sample_point)
+        Translates MATLAB getCOAData function to Python.
+        Retrieves sample information and measurements from the database
+        by joining sample, product, quality, measurement, and variable tables.
+
+        Args:
+            sample_number (str): The sample number to retrieve data for.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing 'sample' and 'measurements' data.
+        """
+        from sqlalchemy import func
+
+        # First query: Get sample information with product and quality
+        # Equivalent to MATLAB's first SELECT statement
+        sample_query = (
+            self.db.query(
+                Product.name_coa.label('grade'),
+                Quality.long_name.label('technical_grade'),
+                Sample.customer,
+                Sample.order_number_pvs,
+                Sample.order_number_client,
+                func.substring(Sample.date, 1, 10).label('sample_date'),
+                Product.bruto,
+                Sample.batch_number,
+                Sample.container_number
             )
-            .filter(Sample.date == report_date)
+            .join(Product, Sample.product_id == Product.id)
+            .join(Quality, Sample.quality_id == Quality.id)
+            .filter(Sample.sample_number == sample_number)
+            .first()
+        )
+
+        if not sample_query:
+            return None
+
+        # Convert sample query result to dictionary
+        sample_data = {
+            'grade': sample_query.grade,
+            'technical_grade': sample_query.technical_grade,
+            'customer': sample_query.customer,
+            'order_number_pvs': sample_query.order_number_pvs,
+            'order_number_client': sample_query.order_number_client,
+            'sample_date': sample_query.sample_date,
+            'bruto': sample_query.bruto,
+            'batch_number': sample_query.batch_number,
+            'container_number': sample_query.container_number
+        }
+
+        # Second query: Get measurements with variable information
+        # Equivalent to MATLAB's second SELECT statement
+        measurements_query = (
+            self.db.query(
+                Variable.test,
+                Variable.element,
+                Measurement.value.label('test_results'),
+                Measurement.min_value,
+                Measurement.max_value,
+                Variable.unit,
+                Measurement.less,
+                Variable.typevar,
+                Measurement.test_date
+            )
+            .join(Sample, Measurement.sample_id == Sample.id)
+            .join(Variable, Measurement.variable_id == Variable.id)
+            .filter(Sample.sample_number == sample_number)
+            .order_by(Variable.ord)
             .all()
         )
 
-        return [
+        # Convert measurements to list of dictionaries
+        # Handle NULL values similar to MATLAB's iif(m.min is null, '', cast(m.min as char))
+        measurements_data = [
             {
-                "id": sample.id,
-                "sample_number": sample.sample_number,
-                "product": sample.product.name if sample.product else "",
-                "quality": sample.quality.name if sample.quality else "",
-                "sample_point": sample.sample_point.name if sample.sample_point else "",
-                "customer": sample.customer
+                'test': m.test,
+                'element': m.element,
+                'test_results': float(m.test_results) if m.test_results is not None else None,
+                'min': str(m.min_value) if m.min_value is not None else '',
+                'max': str(m.max_value) if m.max_value is not None else '',
+                'unit': m.unit,
+                'less': m.less,
+                'typevar': m.typevar,
+                'test_date': m.test_date[:10] if m.test_date else None
             }
-            for sample in samples
+            for m in measurements_query
         ]
+
+        return {
+            'sample': sample_data,
+            'measurements': measurements_data
+        }
 
     async def _create_coa_header(self, sample: Dict[str, Any]) -> List:
         content = []
@@ -364,7 +459,7 @@ class ReportService:
                 data.append([
                     measurement.get('variable', ''),
                     str(value) if value is not None else 'N/A',
-                    '',  # Unit would come from variable definition
+                    measurement.get('unit', ''),
                     str(min_val) if min_val is not None else 'N/A',
                     str(max_val) if max_val is not None else 'N/A',
                     status
@@ -438,10 +533,10 @@ class ReportService:
 
     async def _create_daily_summary_table(self, samples: List[Dict[str, Any]]) -> List:
         content = []
-        
+
         if samples:
             data = [['Sample Number', 'Product', 'Quality', 'Sample Point', 'Customer']]
-            
+
             for sample in samples:
                 data.append([
                     sample.get('sample_number', ''),
@@ -465,5 +560,196 @@ class ReportService:
             content.append(table)
         else:
             content.append(Paragraph("No samples found for the specified date.", self.styles['Normal']))
-        
+
         return content
+
+    async def _create_day_certificate_header(self) -> List:
+        """Create company header section for day certificate."""
+        content = []
+
+        # Add spacing
+        content.append(Spacer(1, 0.3*inch))
+
+        # Company information centered
+        company_style = ParagraphStyle(
+            'CompanyHeader',
+            parent=self.styles['Normal'],
+            fontSize=12,
+            fontName='Helvetica-Bold',
+            alignment=1,  # Center
+            spaceAfter=4
+        )
+
+        content.append(Paragraph("PVS CHEMICALS BELGIUM", company_style))
+        content.append(Paragraph("PANTSERSCHIPSTRAAT 80", company_style))
+        content.append(Paragraph("9000 GHENT, BELGIUM", company_style))
+        content.append(Spacer(1, 0.2*inch))
+
+        return content
+
+    async def _create_day_certificate_sample_info(self, sample_data: Dict[str, Any]) -> List:
+        """Create sample information section for day certificate."""
+        content = []
+
+        sample = sample_data.get('sample', {})
+        measurements = sample_data.get('measurements', [])
+
+        # Get test date from first measurement if available
+        test_date = measurements[0].get('test_date', '') if measurements else ''
+
+        # Format the grade information
+        grade_text = f"{sample.get('grade', 'N/A')} - {sample.get('technical_grade', 'N/A')}"
+
+        # Create sample information with specific layout
+        info_style = ParagraphStyle(
+            'SampleInfo',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            leftIndent=0.5*inch,
+            spaceAfter=8
+        )
+
+        label_style = ParagraphStyle(
+            'LabelBold',
+            parent=self.styles['Normal'],
+            fontSize=10,
+            fontName='Helvetica-Bold',
+            leftIndent=0.5*inch,
+            spaceAfter=8
+        )
+
+        # Grade
+        content.append(Paragraph(f"<b>Grade :</b> {grade_text}", info_style))
+
+        # Customer
+        content.append(Paragraph(f"<b>Customer :</b> {sample.get('customer', 'N/A')}", info_style))
+
+        # PVS Chemicals Ref and Customer Ref (side by side)
+        pvs_ref = sample.get('order_number_pvs', 'N/A')
+        customer_ref = sample.get('order_number_client', 'N/A')
+        content.append(Paragraph(
+            f"<b>PVS Chemicals Ref :</b> {pvs_ref}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            f"<b>Customer Ref :</b> {customer_ref}",
+            info_style
+        ))
+
+        # Sampling Date and Test Date (side by side)
+        content.append(Paragraph(
+            f"<b>Sampling Date :</b> {sample.get('sample_date', 'N/A')}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            f"<b>Test Date :</b> {test_date}",
+            info_style
+        ))
+
+        # Batch number and Container number (side by side)
+        content.append(Paragraph(
+            f"<b>Batch number :</b> {sample.get('batch_number', 'N/A')}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+            f"<b>Container number :</b> {sample.get('container_number', 'N/A')}",
+            info_style
+        ))
+
+        return content
+
+    async def _create_day_certificate_measurements_table(self, sample_data: Dict[str, Any]) -> List:
+        """Create measurements table for day certificate with Test/Results/Specification/Unit columns."""
+        content = []
+
+        measurements = sample_data.get('measurements', [])
+
+        if measurements:
+            # Table header
+            data = [['Test', '', '', 'Test Results', 'Specification', 'Unit']]
+
+            for m in measurements:
+                # Format test results
+                test_result = ''
+                if m.get('test_results') is not None:
+                    test_result = str(m.get('test_results'))
+                    # Handle 'less' flag
+                    if m.get('less'):
+                        test_result = f"< {test_result}"
+
+                # Format specification (combine min and max)
+                spec = ''
+                min_val = m.get('min', '')
+                max_val = m.get('max', '')
+
+                if min_val and max_val:
+                    spec = f"{min_val} - {max_val}"
+                elif min_val:
+                    spec = f">= {min_val}"
+                elif max_val:
+                    spec = f"<= {max_val}"
+
+                # Get test name (prefer 'test' over 'element')
+                test_name = m.get('test', '') or m.get('element', '')
+
+                data.append([
+                    test_name,
+                    '',
+                    '',
+                    test_result,
+                    spec,
+                    m.get('unit', '')
+                ])
+
+            # Create table with appropriate column widths
+            table = Table(data, colWidths=[2*inch, 0.5*inch, 0.5*inch, 1.5*inch, 1.5*inch, 1*inch])
+            table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('ALIGN', (3, 0), (3, -1), 'CENTER'),  # Test Results centered
+                ('ALIGN', (4, 0), (4, -1), 'CENTER'),  # Specification centered
+                ('ALIGN', (5, 0), (5, -1), 'CENTER'),  # Unit centered
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ]))
+
+            content.append(table)
+
+        return content
+
+    async def _create_day_certificate_footer(self, username: str) -> List:
+        """Create footer with quality control note and signatures."""
+        content = []
+
+        content.append(Spacer(1, 0.5*inch))
+
+        # Quality control note
+        note_style = ParagraphStyle(
+            'QCNote',
+            parent=self.styles['Normal'],
+            fontSize=9,
+            leftIndent=0.5*inch,
+            spaceAfter=20
+        )
+        content.append(Paragraph("Quality controle is based on a tank sample.", note_style))
+
+        content.append(Spacer(1, 0.3*inch))
+
+        # Signature section
+        signature_data = [
+            ['Completed by,', '', '', '', '', 'Approved by,'],
+            ['', '', '', '', '', ''],
+            ['', '', '', '', '', ''],
+            [username, '', '', '', '', 'Laboratory Manager']
+        ]
+
+        signature_table = Table(signature_data, colWidths=[1.5*inch, 0.5*inch, 0.5*inch, 0.5*inch, 0.5*inch, 1.5*inch])
+        signature_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+            ('ALIGN', (5, 0), (5, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ]))
+
+        content.append(signature_table)
+
+        return content
+        

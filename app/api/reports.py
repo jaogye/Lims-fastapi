@@ -21,14 +21,14 @@ router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
 class ReportRequest(BaseModel):
-    sample_id: int
+    sample_number: str
     report_type: str  # COA, COC, DAY_COA
     filename: Optional[str] = None
 
 
-@router.get("/coa/{sample_id}")
+@router.get("/coa/{sample_number}")
 async def generate_coa_report(
-    sample_id: int,
+    sample_number: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -36,14 +36,14 @@ async def generate_coa_report(
     
     try:
         pdf_path = await report_service.generate_coa_report(
-            sample_id=sample_id,
+            sample_number=sample_number,
             username=current_user.name
         )
         
         return FileResponse(
             path=pdf_path,
             media_type='application/pdf',
-            filename=f"COA_{sample_id}.pdf"
+            filename=f"COA_{sample_number}.pdf"
         )
     
     except Exception as e:
@@ -53,9 +53,9 @@ async def generate_coa_report(
         )
 
 
-@router.get("/coc/{sample_id}")
+@router.get("/coc/{sample_number}")
 async def generate_coc_report(
-    sample_id: int,
+    sample_number: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -63,14 +63,14 @@ async def generate_coc_report(
     
     try:
         pdf_path = await report_service.generate_coc_report(
-            sample_id=sample_id,
+            sample_number=sample_number,
             username=current_user.name
         )
         
         return FileResponse(
             path=pdf_path,
             media_type='application/pdf',
-            filename=f"COC_{sample_id}.pdf"
+            filename=f"COC_{sample_number}.pdf"
         )
     
     except Exception as e:
@@ -80,9 +80,9 @@ async def generate_coc_report(
         )
 
 
-@router.get("/day-certificate")
+@router.get("/day-certificate/{sample_number}")
 async def generate_day_certificate_report(
-    report_date: str,
+    sample_number: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -90,14 +90,14 @@ async def generate_day_certificate_report(
     
     try:
         pdf_path = await report_service.generate_day_certificate_report(
-            report_date=report_date,
+            sample_number=sample_number,
             username=current_user.name
         )
         
         return FileResponse(
             path=pdf_path,
             media_type='application/pdf',
-            filename=f"DayCertificate_{report_date}.pdf"
+            filename=f"DayCertificate_{sample_number}.pdf"
         )
     
     except Exception as e:
@@ -106,6 +106,7 @@ async def generate_day_certificate_report(
             detail=f"Error generating day certificate report: {str(e)}"
         )
 
+"""
 
 @router.post("/generate")
 async def generate_custom_report(
@@ -118,13 +119,13 @@ async def generate_custom_report(
     try:
         if report_request.report_type == "COA":
             pdf_path = await report_service.generate_coa_report(
-                sample_id=report_request.sample_id,
+                sample_number=report_request.sample_number,
                 username=current_user.name,
                 filename=report_request.filename
             )
         elif report_request.report_type == "COC":
             pdf_path = await report_service.generate_coc_report(
-                sample_id=report_request.sample_id,
+                sample_number=report_request.sample_number,
                 username=current_user.name,
                 filename=report_request.filename
             )
@@ -133,17 +134,20 @@ async def generate_custom_report(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported report type: {report_request.report_type}"
             )
-        
-        filename = report_request.filename or f"{report_request.report_type}_{report_request.sample_id}.pdf"
-        
+
+        filename = report_request.filename or f"{report_request.report_type}_{report_request.sample_number}.pdf"
+
         return FileResponse(
             path=pdf_path,
             media_type='application/pdf',
             filename=filename
         )
-    
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating report: {str(e)}"
         )
+"""

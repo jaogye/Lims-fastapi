@@ -23,6 +23,7 @@ engine = create_engine(
     echo=settings.DEBUG,  # Log SQL queries in debug mode
     pool_pre_ping=True,   # Verify connections before use
     pool_recycle=3600,    # Recycle connections every hour
+    use_setinputsizes=False,  # Fix for SQL Server ODBC precision issues
     connect_args={
         "check_same_thread": False,  # For SQLite compatibility if needed
         "timeout": 30,  # Connection timeout
@@ -48,7 +49,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 def get_db() -> Generator[Session, None, None]:
     """
     Dependency to get database session
-    
+
     Yields:
         Session: SQLAlchemy database session
     """
@@ -56,7 +57,7 @@ def get_db() -> Generator[Session, None, None]:
     try:
         yield db
     except Exception as e:
-        logger.error(f"Database session error: {e}")
+        logger.error(f"Database session error: {type(e).__name__}: {str(e)}", exc_info=True)
         db.rollback()
         raise
     finally:
