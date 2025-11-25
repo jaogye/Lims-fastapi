@@ -6,7 +6,7 @@ creation, retrieval, measurement management, and automated sample loading
 from logistic data. Supports production, customer, and manual samples.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
@@ -61,6 +61,102 @@ class MeasurementResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class QualityInfoItem(BaseModel):
+    variable: str
+    min: Optional[float]
+    max: Optional[float]
+    value: Optional[float]
+
+
+class SampleDetailResponse(BaseModel):
+    sample_number: str
+    customer_name: Optional[str]
+    product: str
+    quality: str
+    tank: Optional[str]
+    sample_date: str
+    orderPVS: Optional[str]
+    orderclient: Optional[str]
+    batch_number: Optional[str]
+    container_number: Optional[str]
+    remark: Optional[str]
+    sample_product_id: Optional[int]
+    sample_quality_id: Optional[int]
+    sample_samplepoint_id: Optional[int]
+    sample_certificate: Optional[str]
+    sample_coa: Optional[str]
+    sample_coc: Optional[str]
+    sample_day_coa: Optional[str]
+    quality_info: List[QualityInfoItem]
+
+
+class SampleUpdateRequest(BaseModel):
+    sample_number: str
+    customer_name: Optional[str]
+    product: str
+    quality: str
+    tank: Optional[str]
+    sample_date: str
+    orderPVS: Optional[str]
+    orderclient: Optional[str]
+    batch_number: Optional[str]
+    container_number: Optional[str]
+    remark: Optional[str]
+    sample_product_id: Optional[int] = None
+    sample_quality_id: Optional[int] = None
+    sample_samplepoint_id: Optional[int] = None
+    sample_certificate: Optional[str] = None
+    sample_coa: Optional[str] = None
+    sample_coc: Optional[str] = None
+    sample_day_coa: Optional[str] = None
+    quality_info: List[QualityInfoItem]
+
+
+@router.get("/get_samples", response_model=List[SampleDetailResponse])
+async def get_samples_detailed(
+    sample_date: str = Query(..., description="Sample date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get samples for a specific date with measurements (CLI and MAN types only).
+
+    Args:
+        sample_date: Date in YYYY-MM-DD format
+
+    Returns:
+        List of samples with their measurements
+    """
+    sample_service = SampleService(db)
+    samples = await sample_service.get_samples_with_measurements(sample_date=sample_date)
+    return samples
+
+
+@router.post("/update_samples")
+async def update_samples(
+    samples: List[SampleUpdateRequest] = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update samples and their measurements with validation.
+
+    Validates that all measurement values are within the allowed min/max range
+    before updating. If any value is out of range, raises an error.
+
+    Args:
+        samples: List of samples to update
+
+    Returns:
+        Success message with update count
+    """
+    sample_service = SampleService(db)
+    # Convert Pydantic models to dictionaries
+    samples_dict = [sample.model_dump() for sample in samples]
+    result = await sample_service.update_samples_batch(samples=samples_dict)
+    return result
 
 
 @router.get("/", response_model=List[SampleResponse])

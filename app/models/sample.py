@@ -40,6 +40,7 @@ class Sample(BaseModel):
         container_number (str): Container number.
         customer (str): Customer name.
         sample_point_id (int): Foreign key to sample point table.
+        samplepoint_name (str): Sample point name (tank name).
         certificate (str): Certificate indicator.
         coc (str): Certificate of Conformity indicator (X/N).
         day_coa (str): Daily Certificate of Analysis indicator (X/N).
@@ -62,11 +63,12 @@ class Sample(BaseModel):
     description = Column(String(60), nullable=True)
     loading_ton = Column(Numeric(12, 6), nullable=True)
     sample_number = Column(String(23), nullable=True)
-    remark = Column(String(10), nullable=True)
+    remark = Column(String(100), nullable=True)
     batch_number = Column(String(20), nullable=True)
     container_number = Column(String(20), nullable=True)
     customer = Column(String(60), nullable=True)
     sample_point_id = Column(Integer, ForeignKey("samplepoint.id"), nullable=True)
+    samplepoint_name = Column(String(50), nullable=True)
     certificate = Column(String(1), nullable=True)
     coc = Column(String(1), nullable=True)
     day_coa = Column(String(1), nullable=True)

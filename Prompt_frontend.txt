@@ -1,0 +1,90 @@
+This python app is from a matlab app.
+
+Now I want to create a web frontend for the python app. 
+
+Let me to explain the frontend of this app when was implemented
+in matlab. In the folder images there are print screens of this matlab webapp.  
+
+1) images\main.png shows a canvas for user validation. 
+
+If the user is  new then the user needs to enter a new password. 
+Then the hidden visual elements are visible and the user can type the new password once done this the visual elements are hidden again. 
+
+In new frontend the buttons:
+a) Sign In must use the endpoint @router.post("/login", response_model=TokenResponse)
+
+b) Sign out must use the endpoint @router.post("/logout")
+
+
+2) images\InputData.png shows a form that to input the results for each sample in  
+
+
+
+
+Matlab webapp do not have mechanism to show windows popup to show message. So   
+
+
+
+
+
+
+
+
+1) Create a get endpoint called get_samples that receives as parameter sample_date a string date in the format "YYYY-MM-DD" and gets a json string  
+
+
+[{"sample_number": str,  "customer_name": str, 
+  "product": str, "quality":str, "tank":str, 
+  "sample_date":str, "orderPVS":str, "orderclient": str,
+  "batch_number":str, "container_number":str, "remark":str,
+  "quality_info": [
+    {"variable": str, "min": float,
+    "max":float, "value": float },
+   ]
+  },
+]
+The elements of this list are  samples corresponding to client and Manual sample (type_sample='CLI' or type_sample='MAN') stored in the table sample and corresponding to sample of the same sample date (sample.date = sample_date). This fields of each sample except "quality_info" are in the tables sample, product, quality and samplepoint. The string names   
+"product": str, "quality":str, "tank":str correspond to product.name, quality name and samplepoint.name. The field "quality_info" is list of measurements corresponding to each sample and those measurements are stored in the table measurement.
+
+ 
+
+2) Create a post endpoint called update_samples that receives a list of updated samples. This a json string with following format:
+
+[{"sample_number": str,  "customer_name": str, 
+  "product": str, "quality":str, "tank":str, 
+  "sample_date":str, "orderPVS":str, "orderclient": str,
+  "batch_number":str, "container_number":str, "remark":str,
+  "quality_info": [
+    {"variable": str, "min": float,
+    "max":float, "value": float },
+   ]
+  },
+]
+Each element of the list is a sample. The fields of each sample that are not "quality_info" must be updated into the table sample using the key sample_number. The fields "product", "quality" and "tank" are string names but their values in the table sample are product_id, quality_id and samplepoint_id. The numerical values are obtained using the string names as keys from the tables product, quality and samplepoint. The field "quality_info" contains a list of measurements done for each variable of the sample. These values will be stored in the table measurement using the key sample_id (this value is obtained from sample table using sample_number as key ) and variable_id (this value is obtained from variable table using variable string name as key). 
+ 
+Previously to the update, the endpoint must validate if each value of the measurement agrees with range of allowed values defined by  min and max fields for each measurement. If a value is out of range, the endpoint must raise an error showing which measurement is not correct.  
+
+ 
+
+1) Modify the endpoint @router.get("/get_samples", response_model=List[SampleDetailResponse]) so that each sample of the output list 
+has the following additional fields from the table sample: sample.product_id, sample.quality_id, sample.samplepoint_id, sample.certificate, sample.coa, sample.coc and sample.day_coa
+
+2) Modify the endpoint @router.post("/update_samples") to receives a json string in the following format:
+[{"sample_number": str,  "customer_name": str, 
+  "product": str, "quality":str, "tank":str, 
+  "sample_date":str, "orderPVS":str, "orderclient": str,
+  "batch_number":str, "container_number":str, "remark":str,
+  "sample_product_id": int, "sample_quality_id": int, "sample_samplepoint_id", "sample_certificate":str, "sample_coa": str, "sample.coc": str, "sample_day_coa":str,
+  "quality_info": [
+    {"variable": str, "min": float,
+    "max":float, "value": float },
+   ]
+  },
+]
+Modify this endpoint to update the value of the following fields in each sample: "tank", "container_number", "batch_number" and "remark".
+
+
+Modify the endpoint @router.post("/update_samples") to validate of the field "tank" for each sample. This validation is based on the table samplepoint. "tank" must appear
+as a name of a samplepoint. The endpoint must store value of "tank" in the column sample.samplepoint_name. 
+
+

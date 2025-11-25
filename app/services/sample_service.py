@@ -297,6 +297,253 @@ class SampleService:
         measurement = await self._generate_sample_measurements(sample)
         return measurement
     
+    async def get_samples_with_measurements(self, sample_date: str) -> List[Dict[str, Any]]:
+        """
+        Get samples for a specific date with measurements (CLI and MAN types only).
+
+        Args:
+            sample_date (str): Sample date in YYYY-MM-DD format.
+
+        Returns:
+            List[Dict[str, Any]]: List of samples with nested measurements.
+        """
+        # Query samples for the date with type_sample = 'CLI' or 'MAN'
+        samples = (
+            self.db.query(Sample)
+            .options(
+                joinedload(Sample.product),
+                joinedload(Sample.quality),
+                joinedload(Sample.sample_point),
+                joinedload(Sample.measurements).joinedload(Measurement.variable)
+            )
+            .filter(
+                and_(
+                    Sample.date == sample_date,
+                    or_(Sample.type_sample == 'CLI', Sample.type_sample == 'MAN')
+                )
+            )
+            .all()
+        )
+
+        result = []
+        for sample in samples:
+            # Build quality_info list from measurements
+            quality_info = []
+            for measurement in sample.measurements:
+                quality_info.append({
+                    "variable": measurement.variable.name.strip() if measurement.variable else "",
+                    "min": float(measurement.min_value) if measurement.min_value is not None else None,
+                    "max": float(measurement.max_value) if measurement.max_value is not None else None,
+                    "value": float(measurement.value) if measurement.value is not None else None
+                })
+
+            sample_dict = {
+                "sample_number": sample.sample_number.strip() if sample.sample_number else "",
+                "customer_name": sample.customer.strip() if sample.customer else None,
+                "product": sample.product.name.strip() if sample.product else "",
+                "quality": sample.quality.name.strip() if sample.quality else "",
+                "tank": sample.sample_point.name.strip() if sample.sample_point else None,
+                "sample_date": sample.date.strip() if sample.date else "",
+                "orderPVS": str(sample.order_number_pvs) if sample.order_number_pvs is not None else None,
+                "orderclient": sample.order_number_client.strip() if sample.order_number_client else None,
+                "batch_number": sample.batch_number.strip() if sample.batch_number else None,
+                "container_number": sample.container_number.strip() if sample.container_number else None,
+                "remark": sample.remark.strip() if sample.remark else None,
+                "sample_product_id": sample.product_id,
+                "sample_quality_id": sample.quality_id,
+                "sample_samplepoint_id": sample.sample_point_id,
+                "sample_certificate": sample.certificate.strip() if sample.certificate else None,
+                "sample_coa": sample.coa.strip() if sample.coa else None,
+                "sample_coc": sample.coc.strip() if sample.coc else None,
+                "sample_day_coa": sample.day_coa.strip() if sample.day_coa else None,
+                "quality_info": quality_info
+            }
+            result.append(sample_dict)
+
+        return result
+
+    async def update_samples_batch(self, samples: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Update samples and their measurements with validation.
+
+        Validates that all measurement values are within allowed ranges before updating.
+        Updates sample fields and measurement values.
+
+        Args:
+            samples (List[Dict[str, Any]]): List of samples to update.
+
+        Returns:
+            Dict[str, Any]: Result with success status and updated count.
+
+        Raises:
+            HTTPException: If any measurement value is out of range.
+        """
+        from fastapi import HTTPException
+
+        validation_errors = []
+
+        # Get maximum field lengths from Sample model column definitions
+        samplepoint_name_max_length = Sample.__table__.columns['samplepoint_name'].type.length
+        container_number_max_length = Sample.__table__.columns['container_number'].type.length
+        batch_number_max_length = Sample.__table__.columns['batch_number'].type.length
+        remark_max_length = Sample.__table__.columns['remark'].type.length
+
+        # First pass: validate all measurements
+        for sample_data in samples:
+            sample_number = sample_data.get("sample_number")
+
+            # Check if sample exists
+            sample = self.db.query(Sample).filter(Sample.sample_number == sample_number).first()
+            if not sample:
+                validation_errors.append(f"Sample {sample_number} not found")
+                continue
+
+            # Validate tank field if provided
+            tank_name = sample_data.get("tank")
+            if tank_name is not None and tank_name:  # Only validate if tank is provided and not empty
+                sample_point = self.db.query(SamplePoint).filter(SamplePoint.name == tank_name).first()
+                if not sample_point:
+                    validation_errors.append(
+                        f"Sample {sample_number}: tank '{tank_name}' not found in samplepoint table"
+                    )
+
+            # Validate field lengths to prevent database truncation errors
+            if sample_data.get("tank") and len(sample_data["tank"]) > samplepoint_name_max_length:
+                validation_errors.append(
+                    f"Sample {sample_number}: tank name exceeds maximum length of {samplepoint_name_max_length} characters (current: {len(sample_data['tank'])})"
+                )
+
+            if sample_data.get("container_number") and len(sample_data["container_number"]) > container_number_max_length:
+                validation_errors.append(
+                    f"Sample {sample_number}: container_number exceeds maximum length of {container_number_max_length} characters (current: {len(sample_data['container_number'])})"
+                )
+
+            if sample_data.get("batch_number") and len(sample_data["batch_number"]) > batch_number_max_length:
+                validation_errors.append(
+                    f"Sample {sample_number}: batch_number exceeds maximum length of {batch_number_max_length} characters (current: {len(sample_data['batch_number'])})"
+                )
+
+            if sample_data.get("remark") and len(sample_data["remark"]) > remark_max_length:
+                validation_errors.append(
+                    f"Sample {sample_number}: remark exceeds maximum length of {remark_max_length} characters (current: {len(sample_data['remark'])})"
+                )
+
+            # Validate each measurement value
+            for quality_item in sample_data.get("quality_info", []):
+                variable_name = quality_item.get("variable")
+                value = quality_item.get("value")
+                min_val = quality_item.get("min")
+                max_val = quality_item.get("max")
+
+                # Only validate if value is provided and not None
+                if value is not None:
+                    # Check min constraint
+                    if min_val is not None and value < min_val:
+                        validation_errors.append(
+                            f"Sample {sample_number}, variable '{variable_name}': "
+                            f"value {value} is below minimum {min_val}"
+                        )
+
+                    # Check max constraint
+                    if max_val is not None and value > max_val:
+                        validation_errors.append(
+                            f"Sample {sample_number}, variable '{variable_name}': "
+                            f"value {value} exceeds maximum {max_val}"
+                        )
+
+        # If there are validation errors, raise exception
+        if validation_errors:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Validation failed: measurements out of range",
+                    "errors": validation_errors
+                }
+            )
+
+        # Second pass: perform updates if all validations passed
+        updated_count = 0
+        for sample_data in samples:
+            sample_number = sample_data.get("sample_number")
+
+            # Get the sample
+            sample = self.db.query(Sample).filter(Sample.sample_number == sample_number).first()
+            if not sample:
+                continue
+
+            # Update only the allowed fields: tank, container_number, batch_number, remark
+
+            # Resolve sample_point_id from tank name and store tank name
+            if sample_data.get("tank") is not None:
+                if sample_data.get("tank"):
+                    tank_name = sample_data["tank"]
+                    sample_point = self.db.query(SamplePoint).filter(SamplePoint.name == tank_name).first()
+                    if sample_point:
+                        sample.sample_point_id = sample_point.id
+                        sample.samplepoint_name = tank_name  # Store the tank name
+                else:
+                    sample.sample_point_id = None
+                    sample.samplepoint_name = None
+
+            if sample_data.get("batch_number") is not None:
+                sample.batch_number = sample_data["batch_number"]
+
+            if sample_data.get("container_number") is not None:
+                sample.container_number = sample_data["container_number"]
+
+            if sample_data.get("remark") is not None:
+                sample.remark = sample_data["remark"]
+
+            # Update measurements
+            for quality_item in sample_data.get("quality_info", []):
+                variable_name = quality_item.get("variable")
+                value = quality_item.get("value")
+
+                # Get variable_id from variable name
+                variable = self.db.query(Variable).filter(Variable.name == variable_name).first()
+                if not variable:
+                    logger.warning(f"Variable '{variable_name}' not found")
+                    continue
+
+                # Find existing measurement
+                measurement = (
+                    self.db.query(Measurement)
+                    .filter(
+                        and_(
+                            Measurement.sample_id == sample.id,
+                            Measurement.variable_id == variable.id
+                        )
+                    )
+                    .first()
+                )
+
+                if measurement:
+                    # Update existing measurement
+                    measurement.value = value
+                    measurement.test_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    # Create new measurement if it doesn't exist
+                    new_measurement = Measurement(
+                        sample_id=sample.id,
+                        variable_id=variable.id,
+                        variable=variable_name,
+                        value=value,
+                        min_value=quality_item.get("min"),
+                        max_value=quality_item.get("max"),
+                        test_date=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    )
+                    self.db.add(new_measurement)
+
+            updated_count += 1
+
+        # Commit all changes
+        self.db.commit()
+
+        return {
+            "message": f"Successfully updated {updated_count} samples",
+            "updated_count": updated_count
+        }
+
     async def get_sample_completion_status(self, sample_number: str) -> Dict[str, Any]:
         """
         Calculate sample testing completion status.
