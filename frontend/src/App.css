@@ -1,0 +1,160 @@
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.page-header {
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #ddd;
+}
+
+.page-header h1 {
+  font-size: 24px;
+  color: #333;
+}
+
+/* Login Page */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f0f0f0;
+}
+
+.login-box {
+  background: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 400px;
+}
+
+.login-box h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.3s;
+}
+
+.btn-primary {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #45a049;
+}
+
+.btn-secondary {
+  background-color: #666;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #555;
+}
+
+.btn-danger {
+  background-color: #f44336;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #da190b;
+}
+
+.btn-full {
+  width: 100%;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* Error Messages */
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid #c62828;
+}
+
+.success-message {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 4px solid #2e7d32;
+}
+
+/* AG-Grid Container */
+.ag-theme-alpine {
+  --ag-border-color: #ddd;
+}
+
+.grid-container {
+  height: 600px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+/* Sample List Colors */
+.sample-complete {
+  background-color: #4CAF50 !important;
+  color: white;
+}
+
+.sample-incomplete {
+  background-color: #FF9800 !important;
+  color: white;
+}

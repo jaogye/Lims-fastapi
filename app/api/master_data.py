@@ -168,3 +168,45 @@ async def download_error_file(
         )
 
 
+@router.get("/products", response_model=List[ProductResponse])
+async def get_products(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all products"""
+    master_data_query = MasterDataQuery(db)
+    products = await master_data_query.get_products()
+    return products
+
+
+@router.get("/qualities", response_model=List[QualityResponse])
+async def get_qualities(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all qualities"""
+    master_data_query = MasterDataQuery(db)
+    qualities = await master_data_query.get_qualities()
+    return qualities
+
+
+@router.get("/sample-points", response_model=List[SamplePointResponse])
+async def get_sample_points(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all sample points"""
+    master_data_query = MasterDataQuery(db)
+    sample_points = await master_data_query.get_sample_points()
+    return sample_points
+
+
+@router.get("/variables", response_model=List[VariableResponse])
+async def get_variables(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all variables"""
+    master_data_query = MasterDataQuery(db)
+    variables = await master_data_query.get_variables()
+    return variables

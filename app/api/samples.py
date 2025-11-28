@@ -20,7 +20,6 @@ from ..models.user import User
 
 router = APIRouter(prefix="/api/samples", tags=["samples"])
 
-
 class SampleResponse(BaseModel):
     id: int
     sample_number: Optional[str]
@@ -348,6 +347,82 @@ async def get_sample_status(
     sample_service = SampleService(db)
     status_info = await sample_service.get_sample_completion_status(sample_number)
     return status_info
+
+
+# Manual Samples CRUD endpoints
+class ManualSampleRequest(BaseModel):
+    sample_point_id: int
+    product_id: int
+    quality_id: int
+    sample_date: str  # YYYY-MM-DD
+    sample_time: str  # HH:MM format
+    remark: Optional[str] = None
+
+
+class ManualSampleResponse(BaseModel):
+    id: int
+    sample_number: Optional[str]
+    sample_point: Optional[str]
+    product: str
+    quality: str
+    sample_date: str
+    sample_time: str
+    remark: Optional[str]
+
+
+@router.get("/manual-samples", response_model=List[ManualSampleResponse])
+async def get_manual_samples(
+    sample_date: str = Query(..., description="Sample date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all manual samples for a specific date"""
+    sample_service = SampleService(db)
+    samples = await sample_service.get_manual_samples(sample_date=sample_date)
+    return samples
+
+
+@router.post("/manual-samples", response_model=ManualSampleResponse)
+async def create_manual_sample(
+    sample_data: ManualSampleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a new manual sample"""
+    sample_service = SampleService(db)
+    sample = await sample_service.create_manual_sample(
+        sample_data=sample_data.model_dump(),
+        user_id=current_user.id
+    )
+    return sample
+
+
+@router.put("/manual-samples/{sample_id}", response_model=ManualSampleResponse)
+async def update_manual_sample(
+    sample_id: int,
+    sample_data: ManualSampleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update an existing manual sample"""
+    sample_service = SampleService(db)
+    sample = await sample_service.update_manual_sample(
+        sample_id=sample_id,
+        sample_data=sample_data.model_dump()
+    )
+    return sample
+
+
+@router.delete("/manual-samples/{sample_id}")
+async def delete_manual_sample(
+    sample_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a manual sample"""
+    sample_service = SampleService(db)
+    result = await sample_service.delete_manual_sample(sample_id=sample_id)
+    return result
 
 
 

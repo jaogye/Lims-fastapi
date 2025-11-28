@@ -69,30 +69,84 @@ class MasterDataQuery:
                     data = getView(self.db, table_type)
                 else:
                    logger.error(f"Unsupported table type: {table_type}. Valid table types: {table_types}")
-                   raise ValueError(f"Unsupported table type: {table_type}. Valid table types: {table_types}")   
+                   raise ValueError(f"Unsupported table type: {table_type}. Valid table types: {table_types}")
 
                 df = pd.DataFrame(data)
                 # Export to Excel with auto-sizing
                 with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
                     df.to_excel(writer, sheet_name=table_type, index=False)
-                    
+
                     # Auto-size columns
                     worksheet = writer.sheets[table_type]
                     self._auto_size_columns(worksheet, df)
-                
+
                 logger.info(f"Successfully exported {len(df)} rows to {excel_path}")
-                
+
                 # Copy file to persistent location before temp dir is deleted
                 persistent_dir = tempfile.gettempdir()
                 persistent_path = os.path.join(persistent_dir, filename)
-                
+
                 import shutil
                 shutil.copy(excel_path, persistent_path)
-                
+
                 return persistent_path
             except Exception as e:
                 logger.error(f"Failed to export {table_type} to Excel: {e}")
                 raise
+
+    async def get_products(self):
+        """Get list of all products"""
+        query = text("SELECT id, name, bruto FROM product ORDER BY name")
+        result = self.db.execute(query)
+        products = []
+        for row in result:
+            products.append({
+                "id": row[0],
+                "name": row[1],
+                "bruto": row[2]
+            })
+        return products
+
+    async def get_qualities(self):
+        """Get list of all qualities"""
+        query = text("SELECT id, name, long_name FROM quality ORDER BY name")
+        result = self.db.execute(query)
+        qualities = []
+        for row in result:
+            qualities.append({
+                "id": row[0],
+                "name": row[1],
+                "long_name": row[2]
+            })
+        return qualities
+
+    async def get_sample_points(self):
+        """Get list of all sample points"""
+        query = text("SELECT id, name FROM samplepoint ORDER BY name")
+        result = self.db.execute(query)
+        sample_points = []
+        for row in result:
+            sample_points.append({
+                "id": row[0],
+                "name": row[1]
+            })
+        return sample_points
+
+    async def get_variables(self):
+        """Get list of all variables"""
+        query = text("SELECT id, short_name, test, element, unit, ord FROM variable ORDER BY ord, short_name")
+        result = self.db.execute(query)
+        variables = []
+        for row in result:
+            variables.append({
+                "id": row[0],
+                "short_name": row[1],
+                "test": row[2],
+                "element": row[3],
+                "unit": row[4],
+                "ord": row[5]
+            })
+        return variables
                 
 
 

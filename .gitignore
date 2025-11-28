@@ -9,6 +9,8 @@ __pycache__/
 
 # C extensions
 *.so
+tmp.*
+/images
 
 # Distribution / packaging
 .Python

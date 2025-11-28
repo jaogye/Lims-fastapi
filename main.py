@@ -24,15 +24,17 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 import logging
 import sys
+import os
 
 from app.core.config  import settings
 from app.database.connection import get_db, test_connection, create_tables
-from app.api import auth, samples, reports, master_data
+from app.api import auth, samples, reports, master_data, users
 
 # ========================================
 # Logging Configuration
@@ -177,12 +179,13 @@ app.include_router(auth.router)  # Authentication endpoints
 app.include_router(samples.router)  # Sample management endpoints
 app.include_router(reports.router)  # Report generation endpoints
 app.include_router(master_data.router)  # Master data endpoints
+app.include_router(users.router)  # User administration endpoints
 
 
 # ========================================
 # API Endpoints
 # ========================================
-@app.get("/")
+@app.get("/api")
 async def root():
     """
     Root endpoint - provides basic information about the API.
@@ -251,6 +254,15 @@ async def app_info():
             "background_tasks": True
         }
     }
+
+
+# ========================================
+# Static Files (Frontend)
+# ========================================
+# Mount static files last - this should come after all API routes
+# Serves the built React frontend from the static directory
+if os.path.exists("static"):
+    app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
 # ========================================

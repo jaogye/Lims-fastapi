@@ -1,32 +1,65 @@
-This python app is from a matlab app.
+This python app is migration from a matlab app. So far we have implemented the backend of the python app.
 
 Now I want to create a web frontend for the python app. 
 
 Let me to explain the frontend of this app when was implemented
-in matlab. In the folder images there are print screens of this matlab webapp.  
-
+in matlab. In the folder images there are print screens of this matlab webapp.
+The main form of this matlab app is a multi-form canvas in which the user can switch into several forms.
+I used the multi-form in matlab since Matlab webapp do not have a mechanism to show popup windows to show messages.
+Hence to show messages in Matlab webapp I create a console form in this multi-form to show messages. 
+Now I am going to explain you the frontend of the matlab app and what functionality in terms of the endpoints of the new python app. 
+  
 1) images\main.png shows a canvas for user validation. 
 
 If the user is  new then the user needs to enter a new password. 
 Then the hidden visual elements are visible and the user can type the new password once done this the visual elements are hidden again. 
 
 In new frontend the buttons:
-a) Sign In must use the endpoint @router.post("/login", response_model=TokenResponse)
+a) Click on button 'Sign In' the app runs the endpoint @router.post("/login", response_model=TokenResponse)
 
-b) Sign out must use the endpoint @router.post("/logout")
-
-
-2) images\InputData.png shows a form that to input the results for each sample in  
+b) Click on button 'Sign out' the app runs the endpoint @router.post("/logout")
 
 
+2) image\MasterTable.png shows a form that contains: a grid table, a dropdown list containing the table-type names : "products", "qualities", "variables", "holidays", "sample_points", "spec-client", "spec-gen", "samplematrix", "maps" ] and two buttons 'Download' and 'Upload'.
+
+The user must select a table-type name from the list. If the user clicks on 'Download', the app runs the endpoint @router.get("/download/{table_type}") and the result of this endpoint is shown in the grid table and shows a popup window to select the folder and the file name excel where the result of these will be stored. 
+
+If the user clicks on 'Upload' then the app shows a popup window so that the user selects which excel file from the local file systems. Once selected the app runs the endpoint @router.post("/upload"). Then the loaded table is shown in the grid table and if this endpoints raise errors shows these to user. 
+ 
+
+3) images\InputData.png shows a form that to input the results of samples in a lab for a given day. 
+
+The user inputs a date and then click on 'Get Data' which runs the endpoints 
+first @router.post("/create-sample") and 
+second @router.get("/get_samples", response_model=List[SampleDetailResponse]).
+Sample numbers of the result of this endpoints are filled in the sample list as you can see in the form images\viewlabo.jpg. In this form the sample numbers 
+have a color. If all measurements of a sample number are inputted  then sample number is completed then the sample number in the list must have green color otherwise must have an orage color. If the user click on any sample number, then the list of item-value are filled with values of the sample and the list of quality info is filled with the quality_info field. Then the user can input the measurement's value of each value of this sample. Hence the user can input the measurement's values of any sample.
+
+If the attributes sample.coa is 'Y' then the button 'COA' appears (it is visible). If the user clicks on button 'COA', the app runs the endpoint @router.get("/coa/{sample_number}") with the sample number of the current user's selection. 
+
+If the attributes sample.coc is 'Y' then the button 'COC' appears (it is visible). If the user clicks on button 'COC', the app runs the endpoint @router.get("/coc/{sample_number}") with the sample number of the current user's selection.
+
+If the attributes sample.day_coa is 'Y' then the button 'C of day' appears (it is visible). If the user clicks on button 'C of day', the app runs the endpoint @router.get("/day-certificate/{sample_number}") with the sample number of the current user's selection.
+
+When the user clicks on button 'Update', the app runs the endpoints @router.post("/update_samples") if this endpoint raises errors, these errors must be shown to the user.   
 
 
-Matlab webapp do not have mechanism to show windows popup to show message. So   
+4) images\manualsample.png shows a form to input an order to do manual sample. We don't have endpoints for this form. So create the necessary endpoints for this form.
+
+5) images\useradministration.png shows a form to create a new user and define the access that the new user has access and load the image file with the signature of the new user.
+
+Now write a model and functional web frontend based on javascript and typescript for the python app. You can create new endpoints if there are necessary to accomplish this task. 
+Additional if you need further information from me you can ask me. 
 
 
 
 
 
+
+
+
+
+====================================================================================================
 
 
 
@@ -86,5 +119,33 @@ Modify this endpoint to update the value of the following fields in each sample:
 
 Modify the endpoint @router.post("/update_samples") to validate of the field "tank" for each sample. This validation is based on the table samplepoint. "tank" must appear
 as a name of a samplepoint. The endpoint must store value of "tank" in the column sample.samplepoint_name. 
+
+
+
+This is piece of code in the class SampleService:
+
+            # Validate field lengths to prevent database truncation errors
+            if sample_data.get("tank") and len(sample_data["tank"]) > 40:
+                validation_errors.append(
+                    f"Sample {sample_number}: tank name exceeds maximum length of 40 characters (current: {len(sample_data['tank'])})"
+                )
+
+            if sample_data.get("container_number") and len(sample_data["container_number"]) > 20:
+                validation_errors.append(
+                    f"Sample {sample_number}: container_number exceeds maximum length of 20 characters (current: {len(sample_data['container_number'])})"
+                )
+
+            if sample_data.get("batch_number") and len(sample_data["batch_number"]) > 20:
+                validation_errors.append(
+                    f"Sample {sample_number}: batch_number exceeds maximum length of 20 characters (current: {len(sample_data['batch_number'])})"
+                )
+
+            if sample_data.get("remark") and len(sample_data["remark"]) > 100:
+                validation_errors.append(
+                    f"Sample {sample_number}: remark exceeds maximum length of 100 characters (current: {len(sample_data['remark'])})"
+                )
+
+
+Modify this code such that the maximum values of the length of fields are obtained from the column definition of the data model of sample.
 
 

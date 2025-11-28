@@ -319,7 +319,7 @@ class SampleService:
             .filter(
                 and_(
                     Sample.date == sample_date,
-                    or_(Sample.type_sample == 'CLI', Sample.type_sample == 'MAN')
+                    or_(Sample.type_sample == 'CLI', Sample.type_sample == 'MAN', Sample.type_sample == 'PRO')
                 )
             )
             .all()
@@ -817,3 +817,213 @@ class SampleService:
             result.append(measurement_dict)
 
         return result
+
+    async def get_manual_samples(self, sample_date: str) -> List[Dict[str, Any]]:
+        """
+        Get all manual samples for a specific date.
+
+        Args:
+            sample_date (str): Sample date in YYYY-MM-DD format.
+
+        Returns:
+            List[Dict[str, Any]]: List of manual samples with details.
+        """
+        samples = (
+            self.db.query(Sample)
+            .options(
+                joinedload(Sample.product),
+                joinedload(Sample.quality),
+                joinedload(Sample.sample_point)
+            )
+            .filter(
+                and_(
+                    Sample.type_sample == "MAN",
+                    Sample.date == sample_date
+                )
+            )
+            .all()
+        )
+
+        result = []
+        for sample in samples:
+            result.append({
+                "id": sample.id,
+                "sample_number": sample.sample_number,
+                "sample_point": sample.sample_point.name if sample.sample_point else None,
+                "product": sample.product.name if sample.product else "",
+                "quality": sample.quality.name if sample.quality else "",
+                "sample_date": sample.date,
+                "sample_time": sample.time,
+                "remark": sample.remark
+            })
+
+        return result
+
+    async def create_manual_sample(
+        self,
+        sample_data: Dict[str, Any],
+        user_id: int
+    ) -> Dict[str, Any]:
+        """
+        Create a new manual sample.
+
+        Args:
+            sample_data (Dict[str, Any]): Sample data including sample_point_id, product_id, quality_id, date, time, remark.
+            user_id (int): ID of the user creating the sample.
+
+        Returns:
+            Dict[str, Any]: Created sample details.
+        """
+        from fastapi import HTTPException
+
+        # Generate sample number
+        sample_number = await self._generate_sample_number("MAN")
+
+        # Get creation timestamp
+        creation_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Create sample
+        new_sample = Sample(
+            type_sample="MAN",
+            sample_number=sample_number,
+            product_id=sample_data["product_id"],
+            quality_id=sample_data["quality_id"],
+            sample_point_id=sample_data["sample_point_id"],
+            date=sample_data["sample_date"],
+            time=sample_data["sample_time"],
+            remark=sample_data.get("remark"),
+            created_by_id=user_id,
+            creation_date=creation_date
+        )
+
+        self.db.add(new_sample)
+        self.db.commit()
+        self.db.refresh(new_sample)
+
+        # Generate measurements for the sample
+        await self._generate_sample_measurements(new_sample)
+
+        # Return the created sample
+        sample = (
+            self.db.query(Sample)
+            .options(
+                joinedload(Sample.product),
+                joinedload(Sample.quality),
+                joinedload(Sample.sample_point)
+            )
+            .filter(Sample.id == new_sample.id)
+            .first()
+        )
+
+        return {
+            "id": sample.id,
+            "sample_number": sample.sample_number,
+            "sample_point": sample.sample_point.name if sample.sample_point else None,
+            "product": sample.product.name if sample.product else "",
+            "quality": sample.quality.name if sample.quality else "",
+            "sample_date": sample.date,
+            "sample_time": sample.time,
+            "remark": sample.remark
+        }
+
+    async def update_manual_sample(
+        self,
+        sample_id: int,
+        sample_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update an existing manual sample.
+
+        Args:
+            sample_id (int): ID of the sample to update.
+            sample_data (Dict[str, Any]): Updated sample data.
+
+        Returns:
+            Dict[str, Any]: Updated sample details.
+        """
+        from fastapi import HTTPException
+
+        # Get the sample
+        sample = self.db.query(Sample).filter(Sample.id == sample_id).first()
+
+        if not sample:
+            raise HTTPException(
+                status_code=404,
+                detail="Sample not found"
+            )
+
+        if sample.type_sample != "MAN":
+            raise HTTPException(
+                status_code=400,
+                detail="Can only update manual samples"
+            )
+
+        # Update sample fields
+        sample.product_id = sample_data["product_id"]
+        sample.quality_id = sample_data["quality_id"]
+        sample.sample_point_id = sample_data["sample_point_id"]
+        sample.date = sample_data["sample_date"]
+        sample.time = sample_data["sample_time"]
+        sample.remark = sample_data.get("remark")
+
+        self.db.commit()
+        self.db.refresh(sample)
+
+        # Return the updated sample
+        sample = (
+            self.db.query(Sample)
+            .options(
+                joinedload(Sample.product),
+                joinedload(Sample.quality),
+                joinedload(Sample.sample_point)
+            )
+            .filter(Sample.id == sample_id)
+            .first()
+        )
+
+        return {
+            "id": sample.id,
+            "sample_number": sample.sample_number,
+            "sample_point": sample.sample_point.name if sample.sample_point else None,
+            "product": sample.product.name if sample.product else "",
+            "quality": sample.quality.name if sample.quality else "",
+            "sample_date": sample.date,
+            "sample_time": sample.time,
+            "remark": sample.remark
+        }
+
+    async def delete_manual_sample(self, sample_id: int) -> Dict[str, str]:
+        """
+        Delete a manual sample.
+
+        Args:
+            sample_id (int): ID of the sample to delete.
+
+        Returns:
+            Dict[str, str]: Success message.
+        """
+        from fastapi import HTTPException
+
+        # Get the sample
+        sample = self.db.query(Sample).filter(Sample.id == sample_id).first()
+
+        if not sample:
+            raise HTTPException(
+                status_code=404,
+                detail="Sample not found"
+            )
+
+        if sample.type_sample != "MAN":
+            raise HTTPException(
+                status_code=400,
+                detail="Can only delete manual samples"
+            )
+
+        # Delete associated measurements first
+        self.db.query(Measurement).filter(Measurement.sample_id == sample_id).delete()
+
+        # Delete the sample
+        self.db.delete(sample)
+        self.db.commit()
+
+        return {"message": "Sample deleted successfully"}
