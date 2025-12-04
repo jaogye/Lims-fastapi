@@ -19,12 +19,22 @@ from ..models.user import User
 router = APIRouter(prefix="/api/users", tags=["users"])
 
 
+class MenuOptionResponse(BaseModel):
+    id: int
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class UserCreateRequest(BaseModel):
     code: str
     name: str
     password: str
     is_admin: bool
     active: bool
+    email: Optional[str] = None
+    reset_password: bool = False  # Only used during update
     options: List[str]  # Access options/permissions
 
 
@@ -34,11 +44,18 @@ class UserResponse(BaseModel):
     name: str
     is_admin: bool
     status: bool
+    email: Optional[str]
+    temp_password: bool
     signature_path: Optional[str]
     options: List[str]
 
     class Config:
         from_attributes = True
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class UserAccessResponse(BaseModel):
@@ -61,6 +78,17 @@ async def get_users(
     user_service = UserService(db)
     users = await user_service.get_all_users()
     return users
+
+
+@router.get("/menu-options", response_model=List[MenuOptionResponse])
+async def get_menu_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all available menu options"""
+    user_service = UserService(db)
+    options = await user_service.get_menu_options()
+    return options
 
 
 @router.get("/{user_id}", response_model=UserResponse)
@@ -226,4 +254,38 @@ async def update_user_access(
 
     user_service = UserService(db)
     result = await user_service.update_user_access(user_id, options)
+    return result
+
+
+@router.post("/change-password")
+async def change_own_password(
+    password_data: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Change current user's own password"""
+    user_service = UserService(db)
+    result = await user_service.change_own_password(
+        current_user.id,
+        password_data.old_password,
+        password_data.new_password
+    )
+    return result
+
+
+@router.delete("/{user_id}/signature")
+async def delete_signature(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete user signature (admin only)"""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can delete signatures"
+        )
+
+    user_service = UserService(db)
+    result = await user_service.delete_signature(user_id)
     return result

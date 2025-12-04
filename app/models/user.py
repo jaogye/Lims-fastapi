@@ -25,15 +25,19 @@ class User(BaseModel):
         status (bool): User account status (active/inactive).
         is_admin (bool): Administrative privileges flag.
         signature (bytes): Digital signature image in binary format.
+        email (str): User's email address.
+        temp_password (bool): Indicates if user must change their password on next login.
     """
     __tablename__ = "tuser"
-    
+
     code = Column(String(20), unique=True, nullable=False, index=True)
     name = Column(String(50), nullable=False)
     hashcode = Column(String(255), nullable=False)
     status = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
     signature = Column(LargeBinary, nullable=True)
+    email = Column(String(320), nullable=True)
+    temp_password = Column(Boolean, default=False, nullable=False)
     
     # Relationships
     user_options = relationship("UserOption", foreign_keys="[UserOption.user_id]", back_populates="user")    

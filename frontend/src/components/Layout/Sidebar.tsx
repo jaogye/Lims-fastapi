@@ -24,7 +24,7 @@ function Sidebar() {
       minHeight: '100vh'
     }}>
       <div style={{ padding: '0 20px', marginBottom: '30px' }}>
-        <h2 style={{ fontSize: '20px', margin: 0 }}>LIMS @ PVS</h2>
+        <h2 style={{ fontSize: '20px', margin: 0 }}>LIMS @ INC </h2>
       </div>
       <nav>
         {menuItems.map((item) => (

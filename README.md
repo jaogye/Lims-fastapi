@@ -262,7 +262,7 @@ SECRET_KEY=your-secret-key-here-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=480
 
 # Application
-APP_NAME=LIMS @ PVS
+APP_NAME=LIMS @ INC
 APP_VERSION=2.0.0
 DEBUG=True
 LOG_LEVEL=INFO

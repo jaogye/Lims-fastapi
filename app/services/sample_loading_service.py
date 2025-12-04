@@ -139,7 +139,7 @@ class SampleLoadingService:
 
             sql = text("""
                 INSERT INTO measurement(sample_id, variable_id, variable_name, min_value, max_value, value)
-                VALUES (:sample_id, :variable_id, :variable_name, :min_val, :max_val, -1)
+                VALUES (:sample_id, :variable_id, :variable_name, :min_val, :max_val, NULL)
             """)
 
             self.db.execute(sql, {
@@ -172,7 +172,7 @@ class SampleLoadingService:
                 # Insert new measurement
                 sql = text("""
                     INSERT INTO measurement(sample_id, variable_id, variable, min_value, max_value, value)
-                    VALUES (:sample_id, :variable_id, :variable, :min_val, :max_val, -1)
+                    VALUES (:sample_id, :variable_id, :variable, :min_val, :max_val, NULL)
                 """)
                 self.db.execute(sql, {
                     'sample_id': sample_id,
@@ -678,7 +678,7 @@ class SampleLoadingService:
             )
             OUTPUT INSERTED.id
             VALUES (
-                :type_sample, :spec_id, 'PVS', :sample_matrix_id,
+                :type_sample, :spec_id, 'INC', :sample_matrix_id,
                 :product_id, :quality_id, :user_id, :creation_date,
                 :date, :time, :description, :sample_number, :sample_point_id, 0
             )

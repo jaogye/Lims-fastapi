@@ -39,6 +39,7 @@ class UserResponse(BaseModel):
     name: str
     is_admin: bool
     status: bool
+    temp_password: bool
     options: list[str]
 
 
@@ -108,12 +109,13 @@ async def get_current_user(
         )
     
     user_options = await auth_service.get_user_options(user.id)
-    
+
     return UserResponse(
         id=user.id,
         code=user.code,
         name=user.name,
         is_admin=user.is_admin,
         status=user.status,
+        temp_password=user.temp_password if hasattr(user, 'temp_password') else False,
         options=user_options
     )

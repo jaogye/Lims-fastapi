@@ -10,7 +10,9 @@ import type {
   ManualSampleResponse,
   ManualSampleRequest,
   UserCreateRequest,
-  MasterDataRow
+  ChangePasswordRequest,
+  MasterDataRow,
+  CreateSampleResponse
 } from '../types';
 
 class ApiService {
@@ -25,8 +27,13 @@ class ApiService {
       },
     });
 
-    // Load token from localStorage
-    this.token = localStorage.getItem('token');
+    // Clean up any old localStorage tokens (migration from localStorage to sessionStorage)
+    if (localStorage.getItem('token')) {
+      localStorage.removeItem('token');
+    }
+
+    // Load token from sessionStorage (cleared when browser closes)
+    this.token = sessionStorage.getItem('token');
     if (this.token) {
       this.setAuthHeader(this.token);
     }
@@ -55,7 +62,7 @@ class ApiService {
       password,
     });
     this.token = response.data.access_token;
-    localStorage.setItem('token', this.token);
+    sessionStorage.setItem('token', this.token);
     this.setAuthHeader(this.token);
     return response.data;
   }
@@ -63,7 +70,7 @@ class ApiService {
   async logout(): Promise<void> {
     await this.api.post('/auth/logout');
     this.token = null;
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     delete this.api.defaults.headers.common['Authorization'];
   }
 
@@ -97,6 +104,25 @@ class ApiService {
     return response.data;
   }
 
+  async getQualitiesByProduct(productId: number): Promise<QualityResponse[]> {
+    const response = await this.api.get<QualityResponse[]>(`/api/master-data/qualities-by-product/${productId}`);
+    return response.data;
+  }
+
+  async getSpecId(productId: number, qualityId: number): Promise<number | null> {
+    const response = await this.api.get<{ spec_id: number | null }>('/api/master-data/spec-id', {
+      params: { product_id: productId, quality_id: qualityId },
+    });
+    return response.data.spec_id;
+  }
+
+  async getSamplePointsByProductQuality(productId: number, qualityId: number): Promise<SamplePointResponse[]> {
+    const response = await this.api.get<SamplePointResponse[]>('/api/master-data/sample-points-by-product-quality', {
+      params: { product_id: productId, quality_id: qualityId },
+    });
+    return response.data;
+  }
+
   async downloadMasterData(tableType: string): Promise<Blob> {
     const response = await this.api.get(`/api/master-data/download/${tableType}`, {
       responseType: 'blob',
@@ -123,8 +149,8 @@ class ApiService {
     return response.data;
   }
 
-  async createSamples(sampleDate: string): Promise<any> {
-    const response = await this.api.post(`/api/samples/create-sample?sample_date=${sampleDate}`);
+  async createSamples(sampleDate: string): Promise<CreateSampleResponse> {
+    const response = await this.api.post<CreateSampleResponse>(`/api/samples/create-sample?sample_date=${sampleDate}`);
     return response.data;
   }
 
@@ -220,6 +246,31 @@ class ApiService {
 
   async updateUserAccess(id: number, options: string[]): Promise<any> {
     const response = await this.api.put(`/api/users/${id}/access`, options);
+    return response.data;
+  }
+
+  async getMenuOptions(): Promise<{ id: number; name: string }[]> {
+    const response = await this.api.get<{ id: number; name: string }[]>('/api/users/menu-options');
+    return response.data;
+  }
+
+  async getSignature(id: number): Promise<Blob> {
+    const response = await this.api.get(`/api/users/${id}/signature`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await this.api.delete(`/api/users/${id}`);
+  }
+
+  async deleteSignature(id: number): Promise<void> {
+    await this.api.delete(`/api/users/${id}/signature`);
+  }
+
+  async changePassword(data: ChangePasswordRequest): Promise<any> {
+    const response = await this.api.post('/api/users/change-password', data);
     return response.data;
   }
 }

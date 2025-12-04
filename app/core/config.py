@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     SMTP_USERNAME: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
     SMTP_USE_TLS: bool = True
+    SMTP_FROM_EMAIL: Optional[str] = None
+    SMTP_FROM_NAME: str = "LIMS System"
     
     # Report Generation Settings
     REPORT_TEMPLATES_DIR: str = "templates/reports"

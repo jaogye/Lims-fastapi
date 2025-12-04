@@ -11,6 +11,8 @@ export interface UserResponse {
   name: string;
   is_admin: boolean;
   status: boolean;
+  email?: string;
+  temp_password: boolean;
   options: string[];
   signature_path?: string;
 }
@@ -85,6 +87,7 @@ export interface ManualSampleRequest {
   sample_point_id: number;
   product_id: number;
   quality_id: number;
+  spec_id: number;
   sample_date: string;
   sample_time: string;
   remark?: string;
@@ -96,9 +99,32 @@ export interface UserCreateRequest {
   password: string;
   is_admin: boolean;
   active: boolean;
+  email?: string;
+  reset_password?: boolean;
   options: string[];
+}
+
+export interface ChangePasswordRequest {
+  old_password: string;
+  new_password: string;
 }
 
 export interface MasterDataRow {
   [key: string]: any;
+}
+
+export interface CreateSampleResponse {
+  message: string;
+  success: boolean;
+  customer_result: {
+    message: string;
+    success: boolean;
+    errors?: string[];
+    pending_data?: any[];
+  };
+  production_result: {
+    message: string;
+    success: boolean;
+    errors?: string[];
+  };
 }

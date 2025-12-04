@@ -24,7 +24,7 @@ function Login({ onLogin }: LoginProps) {
   return (
     <div className="login-container">
       <div className="login-box">
-        <h1>LIMS @ PVS</h1>
+        <h1>LIMS @ INC</h1>
         {error && <div className="error-message">{error}</div>}
 
         <form onSubmit={handleLogin}>

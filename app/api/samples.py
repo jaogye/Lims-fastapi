@@ -262,42 +262,42 @@ async def create_sample(
 ):
     """
     Combined endpoint that loads both customer and production samples for the specified date.
-
+    
     This endpoint:
     - First loads customer samples from logistic data
     - Then generates production samples based on sample matrix and frequency
     - Returns combined results from both operations
-
+    
     Args:
         sample_date: Date in YYYY-MM-DD format for which to load samples
-
+    
     Returns:
         Combined results containing success status, messages, and any errors from both operations
     """
     loading_service = SampleLoadingService(db)
-
+    
     # Load customer samples
     customer_result = await loading_service.load_customer_samples(
         sample_date=sample_date,
         user_id=current_user.id
     )
-
+    
     # Load production samples
     production_result = await loading_service.load_production_samples(
         sample_date=sample_date,
         user_id=current_user.id
     )
-
+    
     # Combine results
     combined_success = customer_result['success'] and production_result['success']
     combined_errors = []
-
+    
     if customer_result.get('errors'):
         combined_errors.extend([f"Customer: {err}" for err in customer_result['errors']])
-
+    
     if production_result.get('errors'):
         combined_errors.extend([f"Production: {err}" for err in production_result['errors']])
-
+    
     response = {
         "message": "Combined sample loading completed",
         "success": combined_success,
@@ -354,6 +354,7 @@ class ManualSampleRequest(BaseModel):
     sample_point_id: int
     product_id: int
     quality_id: int
+    spec_id: int  # Required - obtained from product_id + quality_id
     sample_date: str  # YYYY-MM-DD
     sample_time: str  # HH:MM format
     remark: Optional[str] = None

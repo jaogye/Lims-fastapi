@@ -1,3 +1,7 @@
+/* AG-Grid Theme Imports - Must be first */
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-alpine.css";
+
 * {
   margin: 0;
   padding: 0;
@@ -12,7 +16,3 @@ body {
 #root {
   min-height: 100vh;
 }
-
-/* AG-Grid Theme Imports */
-@import "ag-grid-community/styles/ag-grid.css";
-@import "ag-grid-community/styles/ag-theme-alpine.css";

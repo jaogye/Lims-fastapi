@@ -580,8 +580,8 @@ class ReportService:
             spaceAfter=4
         )
 
-        content.append(Paragraph("PVS CHEMICALS BELGIUM", company_style))
-        content.append(Paragraph("PANTSERSCHIPSTRAAT 80", company_style))
+        content.append(Paragraph("INC CHEMICALS BELGIUM", company_style))
+        content.append(Paragraph("ADDRESS 80", company_style))
         content.append(Paragraph("9000 GHENT, BELGIUM", company_style))
         content.append(Spacer(1, 0.2*inch))
 

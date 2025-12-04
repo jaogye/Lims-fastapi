@@ -114,10 +114,16 @@ async def upload_master_data(
             table_type=table_type
         )
 
+        import json
+
+        # Convert pendingdata to JSON string for frontend
+        pendingdata_json = json.dumps(result["pendingdata"]) if result["pendingdata"] else None
+
         response = {
-            "message": "Master data processing completed",
-            "processed_records": result["processed"],
+            "success": not result.get("has_errors", False),
+            "rows_processed": result["processed"],
             "errors": result.get("errors", []),
+            "pendingdata": pendingdata_json,
             "has_errors": result.get("has_errors", False)
         }
 
@@ -210,3 +216,45 @@ async def get_variables(
     master_data_query = MasterDataQuery(db)
     variables = await master_data_query.get_variables()
     return variables
+
+
+@router.get("/qualities-by-product/{product_id}", response_model=List[QualityResponse])
+async def get_qualities_by_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of qualities filtered by product using spec table"""
+    master_data_query = MasterDataQuery(db)
+    qualities = await master_data_query.get_qualities_by_product(product_id)
+    return qualities
+
+
+class SpecIdResponse(BaseModel):
+    spec_id: Optional[int]
+
+
+@router.get("/spec-id", response_model=SpecIdResponse)
+async def get_spec_id(
+    product_id: int,
+    quality_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get spec_id from product_id and quality_id"""
+    master_data_query = MasterDataQuery(db)
+    spec_id = await master_data_query.get_spec_id(product_id, quality_id)
+    return {"spec_id": spec_id}
+
+
+@router.get("/sample-points-by-product-quality", response_model=List[SamplePointResponse])
+async def get_sample_points_by_product_quality(
+    product_id: int,
+    quality_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get sample points filtered by product and quality using samplematrix"""
+    master_data_query = MasterDataQuery(db)
+    sample_points = await master_data_query.get_sample_points_by_product_quality(product_id, quality_id)
+    return sample_points

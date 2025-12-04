@@ -13,7 +13,8 @@
     "axios": "^1.6.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0"
+    "react-router-dom": "^6.20.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.9.0",
@@ -22,7 +23,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "rollup": "^4.9.0",
     "typescript": "^5.3.3",
-    "vite": "^5.0.8"
+    "vite": "^7.2.4"
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "^4.53.3"

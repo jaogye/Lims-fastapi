@@ -147,7 +147,61 @@ class MasterDataQuery:
                 "ord": row[5]
             })
         return variables
-                
+
+    async def get_qualities_by_product(self, product_id: int):
+        """Get list of qualities filtered by product using spec table"""
+        query = text("""
+            SELECT DISTINCT q.id, q.name, q.long_name
+            FROM quality q, spec s
+            WHERE s.type_spec='GEN'
+              AND s.quality_id = q.id
+              AND s.product_id = :product_id
+            ORDER BY q.name
+        """)
+        result = self.db.execute(query, {"product_id": product_id})
+        qualities = []
+        for row in result:
+            qualities.append({
+                "id": row[0],
+                "name": row[1],
+                "long_name": row[2]
+            })
+        return qualities
+
+    async def get_spec_id(self, product_id: int, quality_id: int):
+        """Get spec_id from product_id and quality_id"""
+        query = text("""
+            SELECT id
+            FROM spec
+            WHERE type_spec='GEN'
+              AND product_id = :product_id
+              AND quality_id = :quality_id
+        """)
+        result = self.db.execute(query, {"product_id": product_id, "quality_id": quality_id})
+        row = result.fetchone()
+        if row:
+            return row[0]
+        return None
+
+    async def get_sample_points_by_product_quality(self, product_id: int, quality_id: int):
+        """Get sample points filtered by product and quality using samplematrix"""
+        query = text("""
+            SELECT DISTINCT sp.id, sp.name
+            FROM samplepoint sp, samplematrix sm
+            WHERE sm.samplepoint_id = sp.id
+              AND sm.product_id = :product_id
+              AND sm.quality_id = :quality_id
+            ORDER BY sp.name
+        """)
+        result = self.db.execute(query, {"product_id": product_id, "quality_id": quality_id})
+        sample_points = []
+        for row in result:
+            sample_points.append({
+                "id": row[0],
+                "name": row[1]
+            })
+        return sample_points
+
 
 
 # Class that stores the DML methods
@@ -199,6 +253,7 @@ class MasterDataService:
                     return {
                         "processed": stat,
                         "errors": msgerror,
+                        "pendingdata": pendingdata.to_dict('records'), 
                         "error_file": error_file_url,
                         "has_errors": len(msgerror) > 0
                     }
@@ -209,7 +264,7 @@ class MasterDataService:
                 logger.error(f"Failed to import from Excel: {e}")
                 raise
 
-        return {"processed":stat, "errors": [], "error_file": None, "has_errors": False}
+        return {"processed":stat, "errors": [], "pendingdata": pendingdata, "error_file": None, "has_errors": False}
 
     def _save_error_rows(self, pendingdata: pd.DataFrame, table_type: str) -> str:
         """Save non-processed rows to an Excel file and return the file path"""

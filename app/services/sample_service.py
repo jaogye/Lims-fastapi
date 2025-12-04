@@ -784,7 +784,7 @@ class SampleService:
             str_value = ""
 
             # Convert value to string representation
-            if measurement.value is not None and measurement.value != -1:
+            if measurement.value is not None :
                 # If less flag is set, prepend "<"
                 if measurement.less:
                     str_value = f"<{float(measurement.value)}"
@@ -888,6 +888,7 @@ class SampleService:
             sample_number=sample_number,
             product_id=sample_data["product_id"],
             quality_id=sample_data["quality_id"],
+            spec_id=sample_data["spec_id"],
             sample_point_id=sample_data["sample_point_id"],
             date=sample_data["sample_date"],
             time=sample_data["sample_time"],
@@ -961,6 +962,7 @@ class SampleService:
         # Update sample fields
         sample.product_id = sample_data["product_id"]
         sample.quality_id = sample_data["quality_id"]
+        sample.spec_id = sample_data["spec_id"]
         sample.sample_point_id = sample_data["sample_point_id"]
         sample.date = sample_data["sample_date"]
         sample.time = sample_data["sample_time"]
