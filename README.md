@@ -12,14 +12,22 @@ This project is a complete full-stack web application for managing laboratory op
 - **Sample Management**: Handle production, customer, and manual samples with full CRUD operations
 - **Report Generation**: Generate COA, COC, and day certificate reports in PDF format
 - **Master Data Management**: Excel-based import/export for products, qualities, variables, specifications, etc.
-- **User Authentication**: JWT-based authentication with role-based access control
-- **User Administration**: Complete user management with access permissions and digital signatures
+- **User Authentication**: JWT-based authentication with role-based access control and temporary password system
+- **User Administration**: Complete user management with access permissions, digital signatures, and email notifications
+- **Permission-Based Access**: Dynamic menu filtering based on user permissions
 - **Web Interface**: Modern React-based web UI with AG-Grid for data tables
 - **RESTful API**: Complete REST API with automatic OpenAPI documentation
 
 ### New Features (Latest Version)
+- **Temporary Password System**: Automatic generation and email delivery of temporary passwords for new users
+- **Forced Password Change**: Blocking modal that requires users to change temporary passwords on first login
+- **Report Generation UI**: Dedicated interface for viewing samples and generating reports (COA, COC, Day Certificate)
+- **View Jobs UI**: Monitor incomplete samples and pending tests in real-time
+- **Email Notifications**: SMTP integration for sending temporary passwords and notifications
+- **User Context Management**: Global user state with React Context for seamless permission management
+- **Signature Management**: Upload, view, and delete user signature images
 - **Manual Sample Management**: Create, edit, and delete manual samples via web UI
-- **User Administration UI**: Manage users, permissions, and upload signature images
+- **User Administration UI**: Manage users, permissions, and upload signature images with automatic password generation
 - **Master Data UI**: Download/upload Excel templates directly from web interface
 - **Input Data UI**: Lab technicians can enter sample measurements with real-time validation
 - **Single Page Application**: Responsive web UI that runs entirely in the browser
@@ -66,7 +74,8 @@ lims-fastapi/
 │   ├── services/              # Business logic services
 │   │   ├── auth_service.py   # Authentication service
 │   │   ├── sample_service.py # Sample management service
-│   │   ├── user_service.py   # User administration (NEW)
+│   │   ├── user_service.py   # User administration with password management
+│   │   ├── email_service.py  # Email service for temporary passwords (NEW)
 │   │   ├── report_service.py # Report generation service
 │   │   └── master_data_service.py # Master data service
 │   ├── reports/              # Report generation utilities
@@ -74,12 +83,17 @@ lims-fastapi/
 ├── frontend/                 # React frontend (NEW)
 │   ├── src/
 │   │   ├── components/       # React components
-│   │   │   ├── Layout/      # Sidebar & layout
+│   │   │   ├── Layout/      # Sidebar & layout with user display
 │   │   │   ├── Login/       # Login page
 │   │   │   ├── MasterTable/ # Master data UI
 │   │   │   ├── InputData/   # Lab data entry
 │   │   │   ├── ManualSample/# Manual sample management
-│   │   │   └── UserAdmin/   # User administration
+│   │   │   ├── ReportGeneration/ # Report generation UI (NEW)
+│   │   │   ├── ViewJobs/    # View incomplete samples (NEW)
+│   │   │   ├── UserAdmin/   # User administration
+│   │   │   └── PasswordChangeModal/ # Password change modal (NEW)
+│   │   ├── contexts/        # React contexts (NEW)
+│   │   │   └── UserContext.tsx # Global user state management
 │   │   ├── services/        # API service layer
 │   │   ├── types/           # TypeScript types
 │   │   ├── App.tsx          # Main app component
@@ -191,14 +205,18 @@ Once the application is running, access the interactive API documentation:
 
 **Supported table types:** products, qualities, variables, holidays, sample_points, spec-client, spec-gen, samplematrix, maps
 
-### User Administration (NEW)
+### User Administration
 - `GET /api/users/` - List all users (admin only)
+- `GET /api/users/menu-options` - Get available menu options
 - `GET /api/users/{id}` - Get user details
-- `POST /api/users/` - Create new user (admin only)
+- `POST /api/users/` - Create new user with auto-generated temporary password (admin only)
 - `PUT /api/users/{id}` - Update user (admin only)
+- `POST /api/users/change-password` - Change own password
 - `POST /api/users/{id}/reset-password` - Reset user password (admin only)
 - `POST /api/users/{id}/signature` - Upload user signature image
 - `GET /api/users/{id}/signature` - Get user signature image
+- `DELETE /api/users/{id}/signature` - Delete user signature (admin only)
+- `DELETE /api/users/{id}` - Delete user (admin only)
 - `GET /api/users/{id}/access` - Get user access permissions
 - `PUT /api/users/{id}/access` - Update user access permissions
 
@@ -208,8 +226,9 @@ The application includes a modern web interface with the following pages:
 
 ### 1. Login Page
 - User authentication with username/password
-- Password change for new users
-- JWT token management
+- Forced password change modal for users with temporary passwords
+- JWT token management with session storage
+- Automatic logout on browser close
 
 ### 2. Master Tables
 - Dropdown to select table type
@@ -235,13 +254,31 @@ The application includes a modern web interface with the following pages:
 - AG-Grid for sample list
 - Form for sample details
 
-### 5. User Administration
+### 5. Report Generation (NEW)
+- Date picker for sample selection
+- AG-Grid showing all samples (Sample Number, Product, Quality, Tank)
+- Sample details panel with read-only fields
+- Report generation buttons (COA, COC, C of Day)
+- Buttons enabled based on sample completion status
+- PDF download functionality
+
+### 6. View Jobs (NEW)
+- Date picker for sample selection
+- AG-Grid showing incomplete samples only
+- Sample counters: Total, Completed, Incompleted
+- Pending tests grid showing variables without values
+- Click on sample to view pending tests with min/max ranges
+
+### 7. User Administration
 - User grid with all users
 - Create/edit user form
+- Email address field (required for new users)
+- Automatic temporary password generation and email delivery
+- Password reset checkbox for existing users
 - Active and Administrator checkboxes
-- Signature image upload
+- Signature image upload, view, and delete
 - Access permissions grid
-- Password reset functionality
+- User deletion functionality
 
 ## Configuration
 
@@ -273,7 +310,20 @@ CORS_ORIGINS=["http://localhost:5173","http://localhost:8000"]
 CORS_ALLOW_CREDENTIALS=True
 CORS_ALLOW_METHODS=["*"]
 CORS_ALLOW_HEADERS=["*"]
+
+# Email Configuration (for temporary passwords)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+SMTP_FROM_NAME=LIMS System
 ```
+
+**Note**: For Gmail, you need to:
+1. Enable 2-factor authentication
+2. Generate an app-specific password
+3. Use the app password in `SMTP_PASSWORD`
 
 ### Database Setup
 
@@ -353,11 +403,21 @@ The system includes utilities to migrate data from the original MATLAB LIMS:
 
 | MATLAB Form | Web Page | Functionality |
 |-------------|----------|---------------|
-| Main (Login) | Login Page | User authentication |
+| Main (Login) | Login Page | User authentication with temp password support |
 | MasterTables | Master Tables | Excel import/export |
 | InputData/ViewLabo | Input Data | Lab measurement entry |
 | ManualSample | Manual Sample | Manual sample CRUD |
-| UserAdministration | User Admin | User management |
+| ReportGen | Report Generation | View samples and generate reports |
+| ViewJobs | View Jobs | Monitor incomplete samples and pending tests |
+| UserAdministration | User Admin | User management with email notifications |
+
+### Menu Access Control
+
+The system implements permission-based menu access:
+- **Admin Users**: See all menu options regardless of assigned permissions
+- **Regular Users**: Only see menu options they have access to (defined in `optionuser` table)
+- Menu options automatically filter based on user permissions on login
+- User code displayed in header on all pages
 
 ## Deployment
 
@@ -420,35 +480,40 @@ cd frontend && npm run dev
 
 ## Project Status
 
-**Current Version: 2.0.0**
+**Current Version: 2.1.0**
 
 ### Completed Features ✅
 - ✅ Complete REST API with FastAPI
 - ✅ JWT authentication and authorization
+- ✅ Temporary password system with email notifications
+- ✅ Forced password change modal for new users
+- ✅ Permission-based menu access control
 - ✅ Sample management (production, customer, manual)
 - ✅ Manual sample CRUD operations
-- ✅ User administration with access control
+- ✅ User administration with access control and signature management
 - ✅ Master data Excel import/export
 - ✅ PDF report generation (COA, COC, Day Certificate)
+- ✅ Report Generation UI for viewing and printing reports
+- ✅ View Jobs UI for monitoring incomplete samples
 - ✅ React + TypeScript web frontend
 - ✅ AG-Grid integration for data tables
 - ✅ Login and authentication UI
-- ✅ Navigation and layout
+- ✅ Navigation and layout with user context
+- ✅ Master Table UI component
+- ✅ Input Data UI component
+- ✅ Manual Sample UI component
+- ✅ User Admin UI component
 - ✅ Static file serving
-
-### In Progress 🚧
-- 🚧 Master Table UI component
-- 🚧 Input Data UI component
-- 🚧 Manual Sample UI component
-- 🚧 User Admin UI component
+- ✅ Email service integration (SMTP)
 
 ### Planned Features 📋
-- 📋 Email notifications
 - 📋 Advanced reporting and analytics
 - 📋 Mobile-responsive design improvements
-- 📋 Audit logging
+- 📋 Audit logging and activity tracking
 - 📋 Data export to various formats
 - 📋 Advanced search and filtering
+- 📋 Email notifications for sample status updates
+- 📋 Dashboard with statistics and charts
 
 ## Documentation
 
@@ -501,6 +566,34 @@ For support and questions:
 
 ---
 
-**Version**: 2.0.0
-**Last Updated**: 2025-01-27
-**Status**: Active Development
+**Version**: 2.1.0
+**Last Updated**: 2025-12-05
+**Status**: Production Ready
+
+## Recent Changes (v2.1.0)
+
+### User Management Enhancements
+- Removed manual password input from user creation form
+- Implemented automatic temporary password generation and email delivery
+- Added forced password change modal for users with temporary passwords
+- Enhanced User Admin with email field (required), signature management, and delete functionality
+
+### New Menu Options
+- **Report Generation**: Dedicated UI for viewing samples and generating COA/COC/Day Certificate reports
+- **View Jobs**: Real-time monitoring of incomplete samples with pending tests display
+
+### Permission System
+- Implemented React Context for global user state management
+- Dynamic menu filtering based on user permissions (optionmenu table)
+- Admin users see all options; regular users see only permitted options
+- User code displayed in header across all pages
+
+### Email Integration
+- SMTP service for sending temporary passwords to new users
+- Email configuration via environment variables
+- Support for Gmail and other SMTP providers
+
+### Security Improvements
+- Session-based token storage (cleared on browser close)
+- Username stripping for consistent password hashing
+- NULL value handling for temp_password database field

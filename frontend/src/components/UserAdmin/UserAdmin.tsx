@@ -24,7 +24,6 @@ function UserAdmin() {
   const [formData, setFormData] = useState<UserCreateRequest>({
     code: '',
     name: '',
-    password: '',
     is_admin: false,
     active: true,
     email: '',
@@ -83,8 +82,14 @@ function UserAdmin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.code || !formData.name || (!editingId && !formData.password)) {
+    if (!formData.code || !formData.name) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    // Validate email is provided for new users (needed to send temp password)
+    if (!editingId && !formData.email) {
+      setError('Email address is required to send temporary password');
       return;
     }
 
@@ -125,7 +130,6 @@ function UserAdmin() {
     setFormData({
       code: user.code,
       name: user.name,
-      password: '', // Don't show existing password
       is_admin: user.is_admin,
       active: user.status,
       email: user.email || '',
@@ -176,7 +180,6 @@ function UserAdmin() {
     setFormData({
       code: '',
       name: '',
-      password: '',
       is_admin: false,
       active: true,
       email: '',
@@ -373,33 +376,21 @@ function UserAdmin() {
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="password">Password {!editingId && '*'}</label>
-              <input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                disabled={loading || (editingId && formData.reset_password)}
-                required={!editingId}
-                placeholder={editingId ? 'Leave blank to keep current' : 'Password'}
-              />
-              {editingId && formData.reset_password && (
-                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
-                  Password field disabled - a temporary password will be generated and emailed to the user
-                </small>
-              )}
-            </div>
-
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label htmlFor="email">Email Address</label>
+              <label htmlFor="email">Email Address *</label>
               <input
                 id="email"
                 type="email"
                 value={formData.email || ''}
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 disabled={loading}
+                required
                 placeholder="user@example.com"
               />
+              {!editingId && (
+                <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                  A temporary password will be generated and sent to this email
+                </small>
+              )}
               {editingId && !formData.email && (
                 <small style={{ color: '#e67e22', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                   Email required for password reset functionality

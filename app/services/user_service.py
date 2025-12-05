@@ -58,7 +58,7 @@ class UserService:
                 "is_admin": row[3],
                 "status": row[4],
                 "email": row[5],
-                "temp_password": row[6],
+                "temp_password": bool(row[6]) if row[6] is not None else False,
                 "signature_path": None,  # Signature stored as BLOB in DB
                 "options": options
             })
@@ -89,7 +89,7 @@ class UserService:
             "is_admin": row[3],
             "status": row[4],
             "email": row[5],
-            "temp_password": row[6],
+            "temp_password": bool(row[6]) if row[6] is not None else False,
             "signature_path": None,  # Signature stored as BLOB in DB
             "options": options
         }
@@ -107,7 +107,7 @@ class UserService:
         return options
 
     async def create_user(self, user_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new user"""
+        """Create a new user with auto-generated temporary password if not provided"""
         # Check if user code already exists
         check_query = "SELECT id FROM tuser WHERE code = :code"
         existing = self.db.execute(text(check_query), {"code": user_data["code"]}).fetchone()
@@ -118,8 +118,29 @@ class UserService:
                 detail=f"User with code '{user_data['code']}' already exists"
             )
 
+        # If no password provided, generate temporary password
+        temp_password_generated = False
+        temp_password = None
+
+        if not user_data.get("password"):
+            # Validate email is provided for sending temp password
+            if not user_data.get("email"):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email address is required when creating user without password"
+                )
+
+            # Generate temporary password
+            temp_password = EmailService.generate_temp_password()
+            temp_password_generated = True
+            password_to_hash = temp_password
+        else:
+            password_to_hash = user_data["password"]
+
         # Hash the password using MATLAB-style (username + password)
-        combined = f"{user_data['code']}{user_data['password']}"
+        # Strip username to match login behavior
+        username = user_data['code'].strip()
+        combined = f"{username}{password_to_hash}"
         hashed_password = get_password_hash(combined)
 
         # Insert user
@@ -134,7 +155,7 @@ class UserService:
             "is_admin": user_data["is_admin"],
             "active": user_data["active"],
             "email": user_data.get("email"),
-            "temp_password": False
+            "temp_password": temp_password_generated
         })
         self.db.commit()
 
@@ -145,6 +166,20 @@ class UserService:
         # Set access options
         if user_data.get("options"):
             await self.update_user_access(user_id, user_data["options"])
+
+        # Send temporary password email if generated
+        if temp_password_generated and temp_password:
+            try:
+                EmailService.send_temp_password_email(
+                    user_data.get("email"),
+                    user_data["name"],
+                    user_data["code"],
+                    temp_password
+                )
+            except Exception as e:
+                logger.error(f"Failed to send temporary password email: {str(e)}")
+                # Don't fail user creation if email fails, but log it
+                logger.warning(f"User created but email not sent. Manual password reset may be needed.")
 
         return await self.get_user_by_id(user_id)
 
@@ -174,7 +209,9 @@ class UserService:
             # Generate temporary password
             temp_password = EmailService.generate_temp_password()
             # Use MATLAB-style hash (username + password)
-            combined = f"{user_data['code']}{temp_password}"
+            # Strip username to match login behavior
+            username = user_data['code'].strip()
+            combined = f"{username}{temp_password}"
             hashed_password = get_password_hash(combined)
 
             # Update password and set temp_password flag

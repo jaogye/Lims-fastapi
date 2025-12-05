@@ -1,3 +1,7 @@
+# 
+# This file contains the prompts used in the creation of this app. The code generator is Claude Code. 
+#
+====================================================================================================
 This python app is migration from a matlab app. So far we have implemented the backend of the python app.
 
 Now I want to create a web frontend for the python app. 
@@ -226,8 +230,79 @@ without 'Sign in' but this session is failed since the app is properly initiated
 
 ============================================================================================================
 
-Implements the menu option 'User Admin'.
+Implements the menu option 'User Admin' of this app. This menu option should look like as in images\useradministration.png that shows a form to create a new user and define the access that the new user has access and load the image file with the signature of the new user. This form uses the tables : tuser, optionmenu and optionuser. This form must store a png file that contains user's signature
+ 
+If you have further questions about this task, you can ask me.
 
-images\useradministration.png shows a form to create a new user and define the access that the new user has access and load the image file with the signature of the new user.
+============================================================================================================
+
+I have added two columns into the table tuser:
+
+email NVARCHAR(320)
+and
+temp_password bit 
+
+I have to do the following modifications in the menu option 'User Admin'.
+
+
+1) Add a textfield to input the user's email. 
+2) Add a check box 'Reset Password'. If the user of this option clicks on this check box, the app must clear the user's password and generate a secret password that will be saved into the table tuser as a hashcode and sent this password to the user by an email. And the app must save a True value in the column tuser.temp_password. This true value says that app must show a form to the user that allow to her to change her password. This form must appears every time that she enters to app until she change her password. Once that she changed the password the form to change passwords must be omitted.  
+
+3) When the user load a new signature file, this image of the signature must be keep in the form after the update and also the image of this signature must be shown every time that 
+ the user of this menu option wants to edit a user's data.  
+
+If you have further questions about this task, you can ask me.
+
+============================================================================================================
+
+I have to make the following modifications in the app.
+
+Every form (menu option) must appear the user code. Every time that a user logins into the app, the app must only show the options that this user can access.
+
+If you have further questions about this task, you can ask me.
+ 
+============================================================================================================
+
+When a user click on a menu option that does not have access, disable all buttons of this form. 
+I do not see the user code in app when I user login.
+ 
+
+============================================================================================================
+
+Eliminate in the menu option 'User Admin' the textfield to input password. Now user's password is created first as temporary password and sent to the user by an email and then the user will create a new password when she enter to the app.
+
+============================================================================================================
+
+First I modify the table optionMenu such that now the names of the menu option are identical to the menu options implemented in the app.
+
+optionMenu
+id      name
+1	Master Tables                 
+2	Input Data                    
+3	Manual Sample                 
+4	Report Gen                    
+5	View Jobs                     
+6	User Admin                    
+
+Implement the menu option 'Report Gen' of the frontend. 
+
+images\reportgeneration.png shows the image of a form that implements this menu option. There is a textfield to select a date and with the button 'Select' the app selects the samples stored from the table sample by showing the samplenumber, product, quality and samplepoint (tank). Then the user click on a row of selected samples and shows their values of this row (sample) in the   textfields besides and then the buttons 'COA', 'COC' and 'C of Day' are enabled according if the values of the columns sample.coa, sample.coc or sample.day_coa is equal to 'X'. 
+
+When the user clicks on the buttons 'COA', 'COC' and 'C of Day' prints the corresponding report identical behaviour in the menu option 'Input Data'. 
+
+
+Implement the menu option 'View Jobs' of the frontend. 
+
+images\viewjobs shows the image of a form that implements this menu option.  There is a textfield to select a date and with the button 'Select' the app selects the non-complete samples stored from the table sample by showing the samplenumber, product, quality and samplepoint (tank). There are textfields showing the total number of samples, total number of non-complete samples.  
+
+When the user click on a row (a sample) of selected samples and the app shows the pending tests (variables) of this sample. 
+   
+  
+If you have further questions about this task, you can ask me.
+============================================================================================================
+
+Update the file readme.md accoring the current state of the app.
+
+============================================================================================================
 
 

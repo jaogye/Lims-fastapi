@@ -30,7 +30,7 @@ class MenuOptionResponse(BaseModel):
 class UserCreateRequest(BaseModel):
     code: str
     name: str
-    password: str
+    password: Optional[str] = None  # Optional - auto-generated if not provided
     is_admin: bool
     active: bool
     email: Optional[str] = None

@@ -96,7 +96,7 @@ export interface ManualSampleRequest {
 export interface UserCreateRequest {
   code: string;
   name: string;
-  password: string;
+  password?: string;
   is_admin: boolean;
   active: boolean;
   email?: string;
